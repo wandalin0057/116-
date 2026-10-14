@@ -55,7 +55,7 @@ model User {
 
 model Session {
   id         String   @id @default(cuid())
-  // 僅儲存工作階段權杖之 SHA-256 雜湊，原始權杖只存在使用者瀏覽器 Cookie
+  // 僅儲存工作階段權杖之 HMAC-SHA256 雜湊，原始權杖只存在使用者瀏覽器 Cookie
   tokenHash  String   @unique
   userId     String
   expiresAt  DateTime @db.Timestamptz

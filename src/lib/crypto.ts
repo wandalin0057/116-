@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 
 /**
  * 敏感欄位（例如附件下載密碼）加密：AES-256-GCM。
@@ -29,6 +29,13 @@ export function decryptSecret(payload: string | null | undefined): string | null
   const decipher = createDecipheriv("aes-256-gcm", getKey(), Buffer.from(ivB64, "base64"));
   decipher.setAuthTag(Buffer.from(tagB64, "base64"));
   return Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]).toString("utf8");
+}
+
+/** 工作階段權杖雜湊：HMAC-SHA256（以 SESSION_SECRET 為金鑰），資料庫外洩時無法比對權杖 */
+export function hashSessionToken(token: string) {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET 未設定");
+  return createHmac("sha256", secret).update(token).digest("hex");
 }
 
 export function sha256(value: string) {

@@ -1,0 +1,58 @@
+# 本機測試用：docker compose up --build
+# 開啟 http://localhost:3000，以 INITIAL_ADMIN_EMAIL / INITIAL_ADMIN_PASSWORD 登入
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: szm
+      POSTGRES_PASSWORD: szm_local_only
+      POSTGRES_DB: szm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U szm"]
+      interval: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://szm:szm_local_only@db:5432/szm?schema=public
+      APP_URL: http://localhost:3000
+      # 以下為本機測試值，正式環境務必更換
+      SESSION_SECRET: local-compose-session-secret-please-change-0123456789
+      DATA_ENCRYPTION_KEY: bG9jYWwtY29tcG9zZS1rZXktMzJieXRlcy1jaGFuZ2U=
+      CRON_SECRET: local-compose-cron-secret
+      EMAIL_PROVIDER: console
+      EMAIL_TEST_MODE: "true"
+      EMAIL_TEST_RECIPIENT: test@example.com
+      INITIAL_ADMIN_EMAIL: admin@example.com
+      INITIAL_ADMIN_PASSWORD: ChangeMe12345
+      INITIAL_ADMIN_NAME: 系統管理員
+
+  # 模擬每日排程：docker compose run --rm cron
+  cron:
+    build: .
+    profiles: ["cron"]
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npm", "run", "cron:daily-reminders"]
+    environment:
+      DATABASE_URL: postgresql://szm:szm_local_only@db:5432/szm?schema=public
+      APP_URL: http://localhost:3000
+      SESSION_SECRET: local-compose-session-secret-please-change-0123456789
+      DATA_ENCRYPTION_KEY: bG9jYWwtY29tcG9zZS1rZXktMzJieXRlcy1jaGFuZ2U=
+      EMAIL_PROVIDER: console
+      EMAIL_TEST_MODE: "true"
+      EMAIL_TEST_RECIPIENT: test@example.com
+
+volumes:
+  pgdata:

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { randomToken, sha256 } from "@/lib/crypto";
+import { hashSessionToken, randomToken } from "@/lib/crypto";
 import type { AuthUser } from "./types";
 
 export const SESSION_COOKIE = "szm_session";
@@ -14,7 +14,7 @@ export async function createSession(userId: string, meta: { ipAddress?: string |
   const expiresAt = new Date(Date.now() + maxAgeMs());
   await prisma.session.create({
     data: {
-      tokenHash: sha256(token),
+      tokenHash: hashSessionToken(token),
       userId,
       expiresAt,
       ipAddress: meta.ipAddress?.slice(0, 64) ?? null,
@@ -27,7 +27,7 @@ export async function createSession(userId: string, meta: { ipAddress?: string |
 /** 驗證工作階段；過期、使用者停用則失效。剩餘時間不足一半時自動延長（滑動到期）。 */
 export async function validateSessionToken(token: string | undefined | null): Promise<{ user: AuthUser; sessionId: string; expiresAt: Date } | null> {
   if (!token || token.length > 200) return null;
-  const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) }, include: { user: true } });
+  const session = await prisma.session.findUnique({ where: { tokenHash: hashSessionToken(token) }, include: { user: true } });
   if (!session) return null;
   const now = Date.now();
   if (session.expiresAt.getTime() <= now || !session.user.isActive) {
@@ -44,7 +44,7 @@ export async function validateSessionToken(token: string | undefined | null): Pr
 }
 
 export async function revokeSessionToken(token: string) {
-  await prisma.session.deleteMany({ where: { tokenHash: sha256(token) } });
+  await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
 }
 
 export async function revokeUserSessions(userId: string) {

@@ -185,13 +185,3 @@ export async function listEmailDrafts(user: AuthUser, query: { q?: string; statu
   ]);
   return { total, page, pageSize, items };
 }
-
-/** 產生 mailto 連結（由使用者之郵件程式開啟，系統不寄送） */
-export function buildMailtoUrl(d: { toRecipients: string; ccRecipients?: string | null; subject: string; body: string }) {
-  const to = d.toRecipients.split(/[,;，；\s]+/).filter(Boolean).join(",");
-  const params = new URLSearchParams();
-  if (d.ccRecipients) params.set("cc", d.ccRecipients.split(/[,;，；\s]+/).filter(Boolean).join(","));
-  params.set("subject", d.subject);
-  params.set("body", d.body);
-  return `mailto:${encodeURIComponent(to).replace(/%2C/g, ",").replace(/%40/g, "@")}?${params.toString().replace(/\+/g, "%20")}`;
-}

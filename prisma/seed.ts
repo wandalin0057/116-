@@ -126,6 +126,12 @@ async function seedDemo() {
       },
       update: {},
     });
+    if (row.reviewMeetingDateTime && !(await prisma.meeting.count({ where: { caseId: row.id } }))) {
+      await prisma.meeting.create({ data: { caseId: row.id, scheduledAt: row.reviewMeetingDateTime, location: row.reviewMeetingLocation } });
+    }
+    if (row.siteVisitDateTime && !(await prisma.siteVisit.count({ where: { caseId: row.id } }))) {
+      await prisma.siteVisit.create({ data: { caseId: row.id, scheduledAt: row.siteVisitDateTime, location: row.siteVisitLocation, uploadUrl: row.siteVisitUploadUrl } });
+    }
     await syncCaseTasks(row.id, { actorId: null, source: "CASE_CREATED", reason: "示範資料" });
   }
   console.log(`✓ 示範資料：使用者 ${users.length} 位（密碼 ${demoPassword}）、案件 ${cases.length} 筆`);

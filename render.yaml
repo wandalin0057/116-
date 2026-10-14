@@ -1,0 +1,66 @@
+# Render Blueprint：網站、每日提醒排程、PostgreSQL
+# 使用方式見 README「Render 部署」
+envVarGroups:
+  - name: school-zone-shared
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATA_ENCRYPTION_KEY
+        generateValue: true   # 256-bit base64；設定後請勿更改，否則無法解密已儲存之下載密碼
+      - key: CRON_SECRET
+        generateValue: true
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: EMAIL_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_TEST_MODE
+        value: "true"         # 驗證完成後，於系統設定頁或此處改為 false
+      - key: EMAIL_TEST_RECIPIENT
+        sync: false
+      - key: APP_URL
+        sync: false           # 例如 https://school-zone.onrender.com 或自訂網域
+      - key: COMPANY_NAME
+        sync: false
+
+services:
+  - type: web
+    name: school-zone-web
+    runtime: docker
+    plan: starter
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - fromGroup: school-zone-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: school-zone-db
+          property: connectionString
+      - key: INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+
+  # 每日臺灣時間 08:00（UTC 00:00）執行，不依賴網站是否有人開啟
+  - type: cron
+    name: school-zone-daily-reminders
+    runtime: docker
+    plan: starter
+    region: singapore
+    schedule: "0 0 * * *"
+    dockerCommand: npm run cron:daily-reminders
+    envVars:
+      - fromGroup: school-zone-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: school-zone-db
+          property: connectionString
+
+databases:
+  - name: school-zone-db
+    plan: basic-256mb        # 免費方案 30 天後到期，正式環境請使用付費方案以保留資料與自動備份
+    region: singapore
+    postgresMajorVersion: "16"
