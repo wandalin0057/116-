@@ -1,0 +1,563 @@
+// 通學區案件期程暨發文管理系統 — 資料庫結構
+// 日期欄位說明：
+//   * 以 @db.Date 儲存的欄位為「臺灣日曆日」（Asia/Taipei），以 UTC 00:00 之 Date 物件表示。
+//   * 以 @db.Timestamptz 儲存的欄位為精確時間點（例如會議時間、完成時間）。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── 使用者與權限 ─────────────────────────
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String
+  passwordHash      String
+  role              UserRole  @default(USER)
+  isActive          Boolean   @default(true)
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime? @db.Timestamptz
+  lastLoginAt       DateTime? @db.Timestamptz
+  passwordChangedAt DateTime? @db.Timestamptz
+  createdAt         DateTime  @default(now()) @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @db.Timestamptz
+
+  sessions            Session[]
+  responsibleCases    SchoolCase[]          @relation("CaseResponsible")
+  caseMemberships     CaseMember[]
+  assignedTasks       Task[]                @relation("TaskAssignee")
+  reminderPreference  ReminderPreference?
+  notificationLogs    NotificationLog[]
+  auditLogs           AuditLog[]
+  createdDocuments    OfficialDocument[]    @relation("DocumentCreatedBy")
+  createdEmailDrafts  EmailDraft[]          @relation("EmailDraftCreatedBy")
+  createdTemplates    DocumentTemplate[]
+  calendarOverrides   BusinessDayOverride[]
+  calendarImports     CalendarYear[]
+  taskHistories       TaskDueDateHistory[]
+  meetingsCreated     Meeting[]
+  siteVisitsCreated   SiteVisit[]
+  deadlineRuleUpdates DeadlineRule[]
+
+  @@index([role, isActive])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  // 僅儲存工作階段權杖之 SHA-256 雜湊，原始權杖只存在使用者瀏覽器 Cookie
+  tokenHash  String   @unique
+  userId     String
+  expiresAt  DateTime @db.Timestamptz
+  lastSeenAt DateTime @default(now()) @db.Timestamptz
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ───────────────────────── 學校案件 ─────────────────────────
+
+enum CaseStatus {
+  ACTIVE // 執行中
+  ON_HOLD // 暫停
+  COMPLETED // 已結案
+  CANCELLED // 已取消
+}
+
+model SchoolCase {
+  id                    String     @id @default(cuid())
+  projectCode           String     @unique
+  projectName           String     @default("115年度臺北市通學區規劃分析案")
+  schoolName            String
+  district              String?
+  agencyName            String?
+  agencyContact         String?
+  agencyEmail           String?
+  responsibleUserId     String
+  notificationDate      DateTime?  @db.Date
+  reviewMeetingDateTime DateTime?  @db.Timestamptz
+  reviewMeetingLocation String?
+  siteVisitDateTime     DateTime?  @db.Timestamptz
+  siteVisitLocation     String?
+  siteVisitUploadUrl    String?
+  status                CaseStatus @default(ACTIVE)
+  notes                 String?
+  createdAt             DateTime   @default(now()) @db.Timestamptz
+  updatedAt             DateTime   @updatedAt @db.Timestamptz
+
+  responsibleUser User               @relation("CaseResponsible", fields: [responsibleUserId], references: [id], onDelete: Restrict)
+  members         CaseMember[]
+  tasks           Task[]
+  meetings        Meeting[]
+  siteVisits      SiteVisit[]
+  documents       OfficialDocument[]
+  emailDrafts     EmailDraft[]
+
+  @@index([responsibleUserId])
+  @@index([status])
+  @@index([schoolName])
+  @@index([projectName])
+  @@index([notificationDate])
+  @@index([reviewMeetingDateTime])
+  @@index([siteVisitDateTime])
+}
+
+enum CaseMemberRole {
+  EDITOR
+  VIEWER
+}
+
+// 案件授權：除負責人外，可授權其他一般使用者檢視或編輯
+model CaseMember {
+  id        String         @id @default(cuid())
+  caseId    String
+  userId    String
+  role      CaseMemberRole @default(EDITOR)
+  createdAt DateTime       @default(now()) @db.Timestamptz
+
+  schoolCase SchoolCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, userId])
+  @@index([userId])
+}
+
+// ───────────────────────── 工作項目 ─────────────────────────
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum TaskType {
+  PRE_REPORT_DRAFT
+  PRE_REPORT_DISPATCH
+  REVIEW_SLIDES_EMAIL
+  REVIEW_MEETING
+  REVIEW_MINUTES_EMAIL
+  REVIEW_DRAWING_DRAFT
+  REVIEW_DRAWING_DISPATCH
+  SITE_VISIT_SLIDES_UPLOAD
+  SITE_VISIT
+  SITE_VISIT_MINUTES_EMAIL
+  SITE_VISIT_DRAWING_DRAFT
+  SITE_VISIT_DRAWING_DISPATCH
+}
+
+model Task {
+  id                String     @id @default(cuid())
+  caseId            String
+  taskType          TaskType
+  title             String
+  description       String?
+  calculatedDueDate DateTime?  @db.Date
+  // 系統計算期限所依據之日曆是否尚未完整公告（暫估）
+  dueDateEstimated  Boolean    @default(false)
+  overrideDueDate   DateTime?  @db.Date
+  overrideReason    String?
+  actualCompletedAt DateTime?  @db.Timestamptz
+  status            TaskStatus @default(NOT_STARTED)
+  assignedUserId    String?
+  reminderEnabled   Boolean    @default(true)
+  createdAt         DateTime   @default(now()) @db.Timestamptz
+  updatedAt         DateTime   @updatedAt @db.Timestamptz
+
+  schoolCase   SchoolCase           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  assignedUser User?                @relation("TaskAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  histories    TaskDueDateHistory[]
+  documents    OfficialDocument[]
+  emailDrafts  EmailDraft[]
+
+  // 同一案件每種工作只會有一筆，避免重複建立
+  @@unique([caseId, taskType])
+  @@index([calculatedDueDate])
+  @@index([overrideDueDate])
+  @@index([status])
+  @@index([assignedUserId])
+}
+
+model TaskDueDateHistory {
+  id           String    @id @default(cuid())
+  taskId       String
+  previousDate DateTime? @db.Date
+  newDate      DateTime? @db.Date
+  changeSource String // CASE_DATE_CHANGE | CALENDAR_RECALC | MANUAL_OVERRIDE | RULE_CHANGE | CREATED
+  reason       String?
+  changedById  String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+
+  task      Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  changedBy User? @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+}
+
+// 期限規則（管理員可調整）
+enum DeadlineAnchor {
+  NOTIFICATION_DATE
+  REVIEW_MEETING
+  SITE_VISIT
+  PRE_REPORT_DISPATCH
+}
+
+model DeadlineRule {
+  id                 String         @id @default(cuid())
+  taskType           TaskType       @unique
+  title              String
+  description        String?
+  anchor             DeadlineAnchor
+  // 正數＝事件後第 N 個工作天；負數＝事件前第 N 個工作天；0＝事件當日
+  offsetBusinessDays Int
+  enabled            Boolean        @default(true)
+  sortOrder          Int            @default(0)
+  updatedById        String?
+  createdAt          DateTime       @default(now()) @db.Timestamptz
+  updatedAt          DateTime       @updatedAt @db.Timestamptz
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+// ───────────────────────── 會議與會勘 ─────────────────────────
+
+enum EventRecordStatus {
+  SCHEDULED // 已排定（目前有效）
+  RESCHEDULED // 已改期（歷史紀錄）
+  HELD // 已辦理
+  CANCELLED // 已取消
+}
+
+model Meeting {
+  id           String            @id @default(cuid())
+  caseId       String
+  scheduledAt  DateTime          @db.Timestamptz
+  location     String?
+  status       EventRecordStatus @default(SCHEDULED)
+  attendees    String?
+  notes        String?
+  changeReason String?
+  createdById  String?
+  createdAt    DateTime          @default(now()) @db.Timestamptz
+  updatedAt    DateTime          @updatedAt @db.Timestamptz
+
+  schoolCase SchoolCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy  User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([caseId, status])
+  @@index([scheduledAt])
+}
+
+model SiteVisit {
+  id           String            @id @default(cuid())
+  caseId       String
+  scheduledAt  DateTime          @db.Timestamptz
+  location     String?
+  uploadUrl    String?
+  status       EventRecordStatus @default(SCHEDULED)
+  attendees    String?
+  notes        String?
+  changeReason String?
+  createdById  String?
+  createdAt    DateTime          @default(now()) @db.Timestamptz
+  updatedAt    DateTime          @updatedAt @db.Timestamptz
+
+  schoolCase SchoolCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy  User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([caseId, status])
+  @@index([scheduledAt])
+}
+
+// ───────────────────────── 公文與 Email 草稿 ─────────────────────────
+
+enum TemplateCategory {
+  DOCUMENT
+  EMAIL
+}
+
+enum TemplateType {
+  // 公文
+  PRE_REPORT // 事前規劃及分析報告書
+  REVIEW_DRAWING // 審查會議後修正圖說
+  SITE_VISIT_DRAWING // 會勘後修正圖說
+  // Email
+  REVIEW_SLIDES_EMAIL // 審查會議前寄送簡報
+  REVIEW_MINUTES_EMAIL // 審查會議後寄送會議紀錄
+  SITE_VISIT_MINUTES_EMAIL // 會勘後寄送會勘紀錄
+}
+
+// 範本版本管理：每次修改皆新增一個版本，僅一個版本為啟用中
+model DocumentTemplate {
+  id          String           @id @default(cuid())
+  category    TemplateCategory
+  type        TemplateType
+  version     Int
+  name        String
+  subject     String
+  body        String
+  isActive    Boolean          @default(false)
+  changeNote  String?
+  createdById String?
+  createdAt   DateTime         @default(now()) @db.Timestamptz
+
+  createdBy   User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  documents   OfficialDocument[]
+  emailDrafts EmailDraft[]
+
+  @@unique([type, version])
+  @@index([type, isActive])
+}
+
+enum DocumentStatus {
+  DRAFT // 草稿
+  DRAFTED // 已創稿
+  DISPATCHED // 已發文
+  CANCELLED // 作廢
+}
+
+enum DocumentType {
+  PRE_REPORT
+  REVIEW_DRAWING
+  SITE_VISIT_DRAWING
+}
+
+model OfficialDocument {
+  id                    String         @id @default(cuid())
+  caseId                String
+  taskId                String?
+  templateId            String?
+  documentType          DocumentType
+  dispatchDate          DateTime?      @db.Date
+  // 正式發文字號由使用者輸入，系統不自行編造
+  documentNumber        String?
+  recipient             String?
+  subject               String
+  body                  String
+  attachments           String?
+  attachmentUrl         String?
+  // 下載密碼以 AES-256-GCM 加密儲存
+  attachmentPasswordEnc String?
+  downloadDeadline      DateTime?      @db.Date
+  primaryRecipients     String? // 正本
+  ccRecipients          String? // 副本
+  draftDate             DateTime?      @db.Date
+  draftCompletedAt      DateTime?      @db.Timestamptz
+  dispatchCompletedAt   DateTime?      @db.Timestamptz
+  status                DocumentStatus @default(DRAFT)
+  createdById           String?
+  createdAt             DateTime       @default(now()) @db.Timestamptz
+  updatedAt             DateTime       @updatedAt @db.Timestamptz
+
+  schoolCase SchoolCase        @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  task       Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  template   DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy  User?             @relation("DocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([caseId, documentType])
+  @@index([status])
+  @@index([dispatchDate])
+}
+
+enum EmailDraftStatus {
+  DRAFT // 草稿
+  CONFIRMED_SENT // 使用者確認已自行寄出
+  CANCELLED
+}
+
+model EmailDraft {
+  id              String           @id @default(cuid())
+  caseId          String
+  taskId          String?
+  templateId      String?
+  templateType    TemplateType
+  toRecipients    String
+  ccRecipients    String?
+  subject         String
+  body            String
+  attachmentNames String?
+  eventDateTime   DateTime?        @db.Timestamptz
+  status          EmailDraftStatus @default(DRAFT)
+  confirmedSentAt DateTime?        @db.Timestamptz
+  confirmedById   String?
+  createdById     String?
+  createdAt       DateTime         @default(now()) @db.Timestamptz
+  updatedAt       DateTime         @updatedAt @db.Timestamptz
+
+  schoolCase SchoolCase        @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  task       Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  template   DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy  User?             @relation("EmailDraftCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([caseId, templateType])
+  @@index([status])
+}
+
+// ───────────────────────── 工作天日曆 ─────────────────────────
+
+// 年度辦公日曆匯入狀態
+model CalendarYear {
+  year         Int      @id
+  // 是否已取得官方公告之完整年度日曆；未完整者，期限一律標示「暫估」
+  isComplete   Boolean  @default(false)
+  source       String
+  sourceNote   String?
+  importedById String?
+  importedAt   DateTime @default(now()) @db.Timestamptz
+
+  importedBy User?             @relation(fields: [importedById], references: [id], onDelete: SetNull)
+  days       HolidayCalendar[]
+}
+
+enum CalendarDayKind {
+  HOLIDAY // 平日放假（國定假日、補假、調整放假）
+  MAKEUP_WORKDAY // 週末補行上班
+}
+
+// 官方辦公日曆中與「週一至週五上班、週末放假」預設不同之日期
+model HolidayCalendar {
+  id          String          @id @default(cuid())
+  year        Int
+  date        DateTime        @unique @db.Date
+  kind        CalendarDayKind
+  description String?
+  createdAt   DateTime        @default(now()) @db.Timestamptz
+
+  calendarYear CalendarYear @relation(fields: [year], references: [year], onDelete: Cascade)
+
+  @@index([year])
+}
+
+// 管理員手動新增之休假日或補行上班日（優先於官方日曆）
+model BusinessDayOverride {
+  id          String          @id @default(cuid())
+  date        DateTime        @unique @db.Date
+  kind        CalendarDayKind
+  reason      String
+  createdById String
+  createdAt   DateTime        @default(now()) @db.Timestamptz
+  updatedAt   DateTime        @updatedAt @db.Timestamptz
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+}
+
+// ───────────────────────── 提醒與通知 ─────────────────────────
+
+model ReminderPreference {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  emailEnabled       Boolean  @default(true)
+  leadBusinessDays   Int      @default(3)
+  overdueEnabled     Boolean  @default(true)
+  dailyDigestEnabled Boolean  @default(true)
+  createdAt          DateTime @default(now()) @db.Timestamptz
+  updatedAt          DateTime @updatedAt @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model NotificationLog {
+  id                String             @id @default(cuid())
+  userId            String
+  type              String // DAILY_DIGEST | TEST
+  // 防止重複寄送：同一使用者、同一類型、同一日期僅一筆
+  dedupeKey         String             @unique
+  digestDate        DateTime           @db.Date
+  recipient         String
+  subject           String
+  status            NotificationStatus @default(PENDING)
+  attemptCount      Int                @default(0)
+  lastError         String?
+  providerMessageId String?
+  isTestMode        Boolean            @default(false)
+  itemCount         Int                @default(0)
+  jobRunId          String?
+  sentAt            DateTime?          @db.Timestamptz
+  createdAt         DateTime           @default(now()) @db.Timestamptz
+  updatedAt         DateTime           @updatedAt @db.Timestamptz
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobRun JobRun? @relation(fields: [jobRunId], references: [id], onDelete: SetNull)
+
+  @@index([digestDate])
+  @@index([status])
+  @@index([userId, createdAt])
+}
+
+enum JobRunStatus {
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+model JobRun {
+  id           String       @id @default(cuid())
+  jobName      String
+  runDate      DateTime     @db.Date
+  trigger      String // CRON | MANUAL | API
+  status       JobRunStatus @default(RUNNING)
+  startedAt    DateTime     @default(now()) @db.Timestamptz
+  finishedAt   DateTime?    @db.Timestamptz
+  sentCount    Int          @default(0)
+  failedCount  Int          @default(0)
+  skippedCount Int          @default(0)
+  message      String?
+
+  notifications NotificationLog[]
+
+  @@index([jobName, runDate])
+  @@index([startedAt])
+}
+
+// 系統設定（例如 Email 測試模式）
+model SystemSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt @db.Timestamptz
+}
+
+// ───────────────────────── 操作紀錄 ─────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  // 已遮蔽敏感欄位之異動內容
+  changes    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}

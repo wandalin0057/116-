@@ -1,0 +1,80 @@
+import type { DeadlineAnchor, TaskStatus, TaskType } from "@prisma/client";
+
+export const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  PRE_REPORT_DRAFT: "事前規劃報告書創稿",
+  PRE_REPORT_DISPATCH: "事前規劃報告書發文",
+  REVIEW_SLIDES_EMAIL: "寄送審查簡報",
+  REVIEW_MEETING: "審查會議",
+  REVIEW_MINUTES_EMAIL: "Email 審查會議紀錄",
+  REVIEW_DRAWING_DRAFT: "審查後修正圖說創稿",
+  REVIEW_DRAWING_DISPATCH: "審查後修正圖說發文",
+  SITE_VISIT_SLIDES_UPLOAD: "上傳會勘簡報",
+  SITE_VISIT: "現場會勘",
+  SITE_VISIT_MINUTES_EMAIL: "Email 會勘紀錄",
+  SITE_VISIT_DRAWING_DRAFT: "會勘後修正圖說創稿",
+  SITE_VISIT_DRAWING_DISPATCH: "會勘後修正圖說發文",
+};
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  NOT_STARTED: "未開始",
+  IN_PROGRESS: "進行中",
+  COMPLETED: "已完成",
+  ON_HOLD: "暫緩",
+  CANCELLED: "已取消",
+};
+
+export const ANCHOR_LABELS: Record<DeadlineAnchor, string> = {
+  NOTIFICATION_DATE: "機關通知日",
+  REVIEW_MEETING: "審查會議日",
+  SITE_VISIT: "會勘日",
+  PRE_REPORT_DISPATCH: "事前規劃報告書發文日",
+};
+
+export type TaskCategory = "DRAFT" | "DISPATCH" | "EMAIL" | "UPLOAD" | "EVENT";
+
+export const TASK_CATEGORY: Record<TaskType, TaskCategory> = {
+  PRE_REPORT_DRAFT: "DRAFT",
+  PRE_REPORT_DISPATCH: "DISPATCH",
+  REVIEW_SLIDES_EMAIL: "EMAIL",
+  REVIEW_MEETING: "EVENT",
+  REVIEW_MINUTES_EMAIL: "EMAIL",
+  REVIEW_DRAWING_DRAFT: "DRAFT",
+  REVIEW_DRAWING_DISPATCH: "DISPATCH",
+  SITE_VISIT_SLIDES_UPLOAD: "UPLOAD",
+  SITE_VISIT: "EVENT",
+  SITE_VISIT_MINUTES_EMAIL: "EMAIL",
+  SITE_VISIT_DRAWING_DRAFT: "DRAFT",
+  SITE_VISIT_DRAWING_DISPATCH: "DISPATCH",
+};
+
+export const TASK_TYPES_BY_CATEGORY = (cat: TaskCategory): TaskType[] =>
+  (Object.keys(TASK_CATEGORY) as TaskType[]).filter((t) => TASK_CATEGORY[t] === cat);
+
+/** 工作類型對應之公文類型 */
+export const TASK_DOCUMENT_TYPE: Partial<Record<TaskType, "PRE_REPORT" | "REVIEW_DRAWING" | "SITE_VISIT_DRAWING">> = {
+  PRE_REPORT_DRAFT: "PRE_REPORT",
+  PRE_REPORT_DISPATCH: "PRE_REPORT",
+  REVIEW_DRAWING_DRAFT: "REVIEW_DRAWING",
+  REVIEW_DRAWING_DISPATCH: "REVIEW_DRAWING",
+  SITE_VISIT_DRAWING_DRAFT: "SITE_VISIT_DRAWING",
+  SITE_VISIT_DRAWING_DISPATCH: "SITE_VISIT_DRAWING",
+};
+
+/** 工作類型對應之 Email 範本 */
+export const TASK_EMAIL_TYPE: Partial<Record<TaskType, "REVIEW_SLIDES_EMAIL" | "REVIEW_MINUTES_EMAIL" | "SITE_VISIT_MINUTES_EMAIL">> = {
+  REVIEW_SLIDES_EMAIL: "REVIEW_SLIDES_EMAIL",
+  REVIEW_MINUTES_EMAIL: "REVIEW_MINUTES_EMAIL",
+  SITE_VISIT_MINUTES_EMAIL: "SITE_VISIT_MINUTES_EMAIL",
+};
+
+/** 行事曆顏色（Tailwind class） */
+export const TASK_COLORS: Record<TaskCategory, { bg: string; text: string; border: string; dot: string; label: string }> = {
+  DRAFT: { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-300", dot: "bg-amber-500", label: "創稿" },
+  DISPATCH: { bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-300", dot: "bg-blue-600", label: "發文" },
+  EMAIL: { bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-300", dot: "bg-emerald-600", label: "Email" },
+  UPLOAD: { bg: "bg-violet-50", text: "text-violet-800", border: "border-violet-300", dot: "bg-violet-600", label: "上傳簡報" },
+  EVENT: { bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-300", dot: "bg-rose-600", label: "會議／會勘" },
+};
+
+export const OPEN_TASK_STATUSES: TaskStatus[] = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD"];
+export const CLOSED_TASK_STATUSES: TaskStatus[] = ["COMPLETED", "CANCELLED"];

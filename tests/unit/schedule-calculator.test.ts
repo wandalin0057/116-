@@ -1,0 +1,89 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_DEADLINE_RULES } from "@/server/schedule/deadline-rules";
+import { calculateSchedule, diffSchedule, type ExistingTaskSnapshot } from "@/server/schedule/schedule-calculator";
+import { bds2026 } from "../helpers/calendar";
+
+const bds = bds2026();
+const due = (list: ReturnType<typeof calculateSchedule>, type: string) => list.find((c) => c.taskType === type)?.dueDate;
+
+describe("期程自動計算", () => {
+  const schedule = calculateSchedule(
+    { notificationDate: "2026-10-14", reviewMeetingDate: "2026-10-22", siteVisitDate: "2026-04-08" },
+    DEFAULT_DEADLINE_RULES,
+    bds,
+  );
+
+  it("5. 機關通知後第 12 工作天發文掛件", () => {
+    expect(due(schedule, "PRE_REPORT_DISPATCH")).toBe("2026-11-02");
+  });
+
+  it("9. 發文前 1 工作天建立創稿工作（週一發文 → 上週五創稿）", () => {
+    expect(due(schedule, "PRE_REPORT_DRAFT")).toBe("2026-10-30");
+  });
+
+  it("6、7. 審查會議前 2、後 1、2、3 工作天", () => {
+    expect(due(schedule, "REVIEW_SLIDES_EMAIL")).toBe("2026-10-20");
+    expect(due(schedule, "REVIEW_MEETING")).toBe("2026-10-22");
+    expect(due(schedule, "REVIEW_MINUTES_EMAIL")).toBe("2026-10-23");
+    expect(due(schedule, "REVIEW_DRAWING_DRAFT")).toBe("2026-10-27");
+    expect(due(schedule, "REVIEW_DRAWING_DISPATCH")).toBe("2026-10-28");
+  });
+
+  it("8. 會勘前 2、後 1、2、3 工作天", () => {
+    expect(due(schedule, "SITE_VISIT_SLIDES_UPLOAD")).toBe("2026-04-02");
+    expect(due(schedule, "SITE_VISIT")).toBe("2026-04-08");
+    expect(due(schedule, "SITE_VISIT_MINUTES_EMAIL")).toBe("2026-04-09");
+    expect(due(schedule, "SITE_VISIT_DRAWING_DRAFT")).toBe("2026-04-10");
+    expect(due(schedule, "SITE_VISIT_DRAWING_DISPATCH")).toBe("2026-04-13");
+  });
+
+  it("日期可分次填寫：未填之事件不產生期限", () => {
+    const partial = calculateSchedule({ notificationDate: "2026-10-14", reviewMeetingDate: null, siteVisitDate: null }, DEFAULT_DEADLINE_RULES, bds);
+    expect(due(partial, "PRE_REPORT_DISPATCH")).toBe("2026-11-02");
+    expect(due(partial, "REVIEW_MEETING")).toBeNull();
+    expect(due(partial, "SITE_VISIT")).toBeNull();
+  });
+
+  it("發文日人工鎖定時，創稿期限以鎖定日為基準", () => {
+    const s = calculateSchedule({ notificationDate: "2026-10-14", reviewMeetingDate: null, siteVisitDate: null }, DEFAULT_DEADLINE_RULES, bds, {
+      effectiveDueDates: { PRE_REPORT_DISPATCH: "2026-11-10" },
+    });
+    expect(due(s, "PRE_REPORT_DRAFT")).toBe("2026-11-09");
+  });
+});
+
+describe("期限差異比對", () => {
+  const base = (over: Partial<ExistingTaskSnapshot>): ExistingTaskSnapshot => ({
+    id: "t1",
+    taskType: "REVIEW_MINUTES_EMAIL",
+    title: "Email 提供審查會議紀錄",
+    status: "NOT_STARTED",
+    calculatedDueDate: "2026-10-23",
+    dueDateEstimated: false,
+    overrideDueDate: null,
+    ...over,
+  });
+  const computed = calculateSchedule({ notificationDate: null, reviewMeetingDate: "2026-10-29", siteVisitDate: null }, DEFAULT_DEADLINE_RULES, bds);
+
+  it("10. 變更會議日期後，未完成工作更新期限", () => {
+    const changes = diffSchedule([base({})], computed);
+    const c = changes.find((x) => x.taskType === "REVIEW_MINUTES_EMAIL")!;
+    expect(c).toMatchObject({ action: "UPDATE", previousDate: "2026-10-23", newDate: "2026-10-30" });
+  });
+
+  it("11. 已完成工作保留紀錄，不會被重設", () => {
+    const changes = diffSchedule([base({ status: "COMPLETED" })], computed);
+    expect(changes.find((x) => x.taskType === "REVIEW_MINUTES_EMAIL")).toMatchObject({ action: "SKIP_COMPLETED", newDate: "2026-10-23" });
+  });
+
+  it("人工鎖定之期限不被更新", () => {
+    const changes = diffSchedule([base({ overrideDueDate: "2026-10-26" })], computed);
+    expect(changes.find((x) => x.taskType === "REVIEW_MINUTES_EMAIL")?.action).toBe("SKIP_LOCKED");
+  });
+
+  it("避免重複建立：已存在之工作不會再新建", () => {
+    const changes = diffSchedule([base({})], computed);
+    expect(changes.filter((x) => x.taskType === "REVIEW_MINUTES_EMAIL")).toHaveLength(1);
+    expect(changes.filter((x) => x.action === "CREATE").map((x) => x.taskType)).not.toContain("REVIEW_MINUTES_EMAIL");
+  });
+});

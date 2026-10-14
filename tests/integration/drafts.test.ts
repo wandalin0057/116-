@@ -1,0 +1,86 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { prisma } from "@/lib/db";
+import { createCase } from "@/server/cases/case-service";
+import {
+  createDocumentDraft,
+  getDocumentForEdit,
+  markDocumentDispatched,
+  markDocumentDrafted,
+  renderDocumentContent,
+  updateDocument,
+} from "@/server/documents/document-service";
+import { confirmEmailSent, createEmailDraft, updateEmailDraft } from "@/server/emails/email-draft-service";
+import * as mailerModule from "@/server/reminders/mailer";
+import { caseInput, hasTestDb, makeUser, resetDatabase, seedBasics } from "../helpers/db";
+
+describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+    await seedBasics();
+  });
+
+  it("15. Email 草稿不會在未確認時自動寄出", async () => {
+    const spy = vi.spyOn(mailerModule, "createMailer");
+    const u = await makeUser("pm@example.com");
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const draft = await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_SLIDES_EMAIL" });
+    expect(draft.status).toBe("DRAFT");
+    expect(draft.toRecipients).toBe("agency@example.com");
+    expect(draft.body).toContain("張承辦 您好");
+    await updateEmailDraft(u, draft.id, { toRecipients: "agency@example.com", subject: draft.subject, body: draft.body + "\n補充" });
+    expect((await prisma.emailDraft.findUniqueOrThrow({ where: { id: draft.id } })).status).toBe("DRAFT");
+    // 未勾選確認不可標記
+    await expect(confirmEmailSent(u, draft.id, { confirmed: false })).rejects.toThrow(/確認/);
+    const task = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "REVIEW_SLIDES_EMAIL" } });
+    expect(task.status).toBe("NOT_STARTED");
+    expect(spy).not.toHaveBeenCalled();
+    expect(await prisma.notificationLog.count()).toBe(0);
+
+    await confirmEmailSent(u, draft.id, { confirmed: true });
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("COMPLETED");
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("公文：密碼加密儲存、創稿與發文分別完成、發文字號由使用者輸入", async () => {
+    const u = await makeUser("pm@example.com");
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const doc = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "PRE_REPORT" });
+    expect(doc.documentNumber).toBeNull();
+    expect(doc.body).toContain("115年10月14日");
+    await updateDocument(u, doc.id, {
+      subject: doc.subject,
+      body: doc.body,
+      attachmentUrl: "https://files.example.com/x",
+      attachmentPassword: "Secret99",
+      downloadDeadline: "2026-11-30",
+    });
+    const raw = await prisma.officialDocument.findUniqueOrThrow({ where: { id: doc.id } });
+    expect(raw.attachmentPasswordEnc).not.toContain("Secret99");
+    expect(raw.body).not.toContain("Secret99");
+    const full = await getDocumentForEdit(u, doc.id);
+    const content = renderDocumentContent(full);
+    expect(content.bodyLines[2]).toBe("三、附件網址：https://files.example.com/x，下載密碼：Secret99（請於115年11月30日前下載）。");
+
+    await markDocumentDrafted(u, doc.id);
+    const draftTask = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DRAFT" } });
+    const dispatchTask = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DISPATCH" } });
+    expect(draftTask.status).toBe("COMPLETED");
+    expect(dispatchTask.status).toBe("NOT_STARTED");
+
+    await expect(markDocumentDispatched(u, doc.id, { documentNumber: "", dispatchDate: "2026-11-02" })).rejects.toThrow(/發文字號/);
+    await markDocumentDispatched(u, doc.id, { documentNumber: "交顧字第1150001號", dispatchDate: "2026-11-02" });
+    const after = await prisma.officialDocument.findUniqueOrThrow({ where: { id: doc.id } });
+    expect(after.documentNumber).toBe("交顧字第1150001號");
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: dispatchTask.id } })).status).toBe("COMPLETED");
+    await expect(updateDocument(u, doc.id, { subject: "x", body: "y" })).rejects.toThrow(/不可修改/);
+  });
+
+  it("操作紀錄不包含下載密碼", async () => {
+    const u = await makeUser("pm@example.com");
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const doc = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "REVIEW_DRAWING" });
+    await updateDocument(u, doc.id, { subject: doc.subject, body: doc.body, attachmentPassword: "TopSecret77" });
+    const logs = await prisma.auditLog.findMany();
+    expect(JSON.stringify(logs)).not.toContain("TopSecret77");
+  });
+});

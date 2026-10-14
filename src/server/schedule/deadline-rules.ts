@@ -1,0 +1,124 @@
+import type { DeadlineAnchor, TaskType } from "@prisma/client";
+
+export interface DeadlineRuleDef {
+  taskType: TaskType;
+  title: string;
+  description: string;
+  anchor: DeadlineAnchor;
+  /** 正數＝事件後第 N 工作天；負數＝事件前第 N 工作天；0＝事件當日 */
+  offsetBusinessDays: number;
+  enabled: boolean;
+  sortOrder: number;
+}
+
+/** 預設期限規則（依通學區規劃案作業流程） */
+export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
+  {
+    taskType: "PRE_REPORT_DISPATCH",
+    title: "事前規劃及分析報告書發文掛件",
+    description: "機關通知日（D0）後第 12 個工作天發文掛件",
+    anchor: "NOTIFICATION_DATE",
+    offsetBusinessDays: 12,
+    enabled: true,
+    sortOrder: 10,
+  },
+  {
+    taskType: "PRE_REPORT_DRAFT",
+    title: "建立事前規劃報告書公文草稿",
+    description: "發文前第 1 個工作天完成創稿",
+    anchor: "PRE_REPORT_DISPATCH",
+    offsetBusinessDays: -1,
+    enabled: true,
+    sortOrder: 5,
+  },
+  {
+    taskType: "REVIEW_SLIDES_EMAIL",
+    title: "寄送審查簡報給機關",
+    description: "審查會議前第 2 個工作天寄送簡報",
+    anchor: "REVIEW_MEETING",
+    offsetBusinessDays: -2,
+    enabled: true,
+    sortOrder: 20,
+  },
+  {
+    taskType: "REVIEW_MEETING",
+    title: "召開審查會議",
+    description: "審查會議當日（D0）",
+    anchor: "REVIEW_MEETING",
+    offsetBusinessDays: 0,
+    enabled: true,
+    sortOrder: 25,
+  },
+  {
+    taskType: "REVIEW_MINUTES_EMAIL",
+    title: "Email 提供審查會議紀錄",
+    description: "審查會議後第 1 個工作天",
+    anchor: "REVIEW_MEETING",
+    offsetBusinessDays: 1,
+    enabled: true,
+    sortOrder: 30,
+  },
+  {
+    taskType: "REVIEW_DRAWING_DRAFT",
+    title: "建立審查會議後修正圖說公文草稿",
+    description: "審查會議後第 2 個工作天",
+    anchor: "REVIEW_MEETING",
+    offsetBusinessDays: 2,
+    enabled: true,
+    sortOrder: 35,
+  },
+  {
+    taskType: "REVIEW_DRAWING_DISPATCH",
+    title: "正式發文提供審查會議後修正規劃圖說",
+    description: "審查會議後第 3 個工作天",
+    anchor: "REVIEW_MEETING",
+    offsetBusinessDays: 3,
+    enabled: true,
+    sortOrder: 40,
+  },
+  {
+    taskType: "SITE_VISIT_SLIDES_UPLOAD",
+    title: "上傳會勘簡報至承辦提供之連結",
+    description: "會勘前第 2 個工作天",
+    anchor: "SITE_VISIT",
+    offsetBusinessDays: -2,
+    enabled: true,
+    sortOrder: 50,
+  },
+  {
+    taskType: "SITE_VISIT",
+    title: "辦理現場會勘",
+    description: "會勘當日（D0）",
+    anchor: "SITE_VISIT",
+    offsetBusinessDays: 0,
+    enabled: true,
+    sortOrder: 55,
+  },
+  {
+    taskType: "SITE_VISIT_MINUTES_EMAIL",
+    title: "Email 提供會勘紀錄",
+    description: "會勘後第 1 個工作天",
+    anchor: "SITE_VISIT",
+    offsetBusinessDays: 1,
+    enabled: true,
+    sortOrder: 60,
+  },
+  {
+    taskType: "SITE_VISIT_DRAWING_DRAFT",
+    title: "建立會勘後修正圖說公文草稿",
+    description: "會勘後第 2 個工作天",
+    anchor: "SITE_VISIT",
+    offsetBusinessDays: 2,
+    enabled: true,
+    sortOrder: 65,
+  },
+  {
+    taskType: "SITE_VISIT_DRAWING_DISPATCH",
+    title: "正式發文提供會勘後修正規劃圖說",
+    description: "會勘後第 3 個工作天",
+    anchor: "SITE_VISIT",
+    offsetBusinessDays: 3,
+    enabled: true,
+    sortOrder: 70,
+  },
+];

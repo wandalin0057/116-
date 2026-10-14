@@ -1,0 +1,33 @@
+{
+  "year": 2026,
+  "isComplete": true,
+  "source": "行政院人事行政總處「中華民國115年（西元2026年）政府行政機關辦公日曆表」（114年6月13日核定）",
+  "note": "全年放假日共 120 日，無補行上班日。正式上線前請管理員自政府資料開放平臺下載官方 CSV 重新匯入核對。",
+  "days": [
+    { "date": "2026-01-01", "kind": "HOLIDAY", "description": "開國紀念日" },
+    { "date": "2026-02-14", "kind": "HOLIDAY", "description": "春節連假" },
+    { "date": "2026-02-15", "kind": "HOLIDAY", "description": "除夕前一日" },
+    { "date": "2026-02-16", "kind": "HOLIDAY", "description": "除夕" },
+    { "date": "2026-02-17", "kind": "HOLIDAY", "description": "春節" },
+    { "date": "2026-02-18", "kind": "HOLIDAY", "description": "春節" },
+    { "date": "2026-02-19", "kind": "HOLIDAY", "description": "春節" },
+    { "date": "2026-02-20", "kind": "HOLIDAY", "description": "除夕前一日補假" },
+    { "date": "2026-02-21", "kind": "HOLIDAY", "description": "春節連假" },
+    { "date": "2026-02-22", "kind": "HOLIDAY", "description": "春節連假" },
+    { "date": "2026-02-27", "kind": "HOLIDAY", "description": "和平紀念日補假" },
+    { "date": "2026-02-28", "kind": "HOLIDAY", "description": "和平紀念日" },
+    { "date": "2026-04-03", "kind": "HOLIDAY", "description": "兒童節補假" },
+    { "date": "2026-04-04", "kind": "HOLIDAY", "description": "兒童節" },
+    { "date": "2026-04-05", "kind": "HOLIDAY", "description": "民族掃墓節" },
+    { "date": "2026-04-06", "kind": "HOLIDAY", "description": "民族掃墓節補假" },
+    { "date": "2026-05-01", "kind": "HOLIDAY", "description": "勞動節" },
+    { "date": "2026-06-19", "kind": "HOLIDAY", "description": "端午節" },
+    { "date": "2026-09-25", "kind": "HOLIDAY", "description": "中秋節" },
+    { "date": "2026-09-28", "kind": "HOLIDAY", "description": "孔子誕辰紀念日（教師節）" },
+    { "date": "2026-10-09", "kind": "HOLIDAY", "description": "國慶日補假" },
+    { "date": "2026-10-10", "kind": "HOLIDAY", "description": "國慶日" },
+    { "date": "2026-10-25", "kind": "HOLIDAY", "description": "臺灣光復暨金門古寧頭大捷紀念日" },
+    { "date": "2026-10-26", "kind": "HOLIDAY", "description": "臺灣光復暨金門古寧頭大捷紀念日補假" },
+    { "date": "2026-12-25", "kind": "HOLIDAY", "description": "行憲紀念日" }
+  ]
+}
