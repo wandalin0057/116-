@@ -1,0 +1,58 @@
+# 免費版每日提醒排程（GitHub Actions）
+# 每天臺灣時間 08:00（UTC 00:00）直接執行提醒程式：讀取資料庫、以 Gmail 寄信。
+# Render 免費方案封鎖對外寄信（SMTP），因此改由此處寄送。
+#
+# 需在 GitHub 儲存庫 Settings → Secrets and variables → Actions 設定：
+#   DATABASE_URL    Neon 資料庫連線字串（與 Render 相同）
+#   SITE_URL        網站網址，例如 https://school-zone.onrender.com
+#   GMAIL_ADDRESS   寄件 Gmail 地址
+#   GMAIL_APP_PASSWORD  Gmail「應用程式密碼」（16 碼）
+#   TEST_RECIPIENT  測試收件人（測試模式時所有提醒寄到這裡）
+name: 每日提醒
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "非工作天也執行（測試用）"
+        type: boolean
+        default: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 檢查設定
+        id: check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "尚未設定 DATABASE_URL，略過"; echo "skip=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.skip != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安裝套件
+        if: steps.check.outputs.skip != 'true'
+        run: npm ci && npx prisma generate
+      - name: 寄送每日提醒
+        if: steps.check.outputs.skip != 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_URL: ${{ secrets.SITE_URL }}
+          EMAIL_PROVIDER: ${{ secrets.GMAIL_ADDRESS != '' && 'smtp' || 'console' }}
+          SMTP_HOST: smtp.gmail.com
+          SMTP_PORT: "465"
+          SMTP_SECURE: "true"
+          SMTP_USER: ${{ secrets.GMAIL_ADDRESS }}
+          SMTP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_FROM: 通學區案件系統 <${{ secrets.GMAIL_ADDRESS }}>
+          EMAIL_TEST_RECIPIENT: ${{ secrets.TEST_RECIPIENT }}
+          COMPANY_NAME: 通學區案件系統
+        run: npx tsx scripts/run-daily-reminders.ts ${{ inputs.force && '--force' || '' }}

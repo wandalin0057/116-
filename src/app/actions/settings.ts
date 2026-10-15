@@ -55,6 +55,9 @@ export async function sendTestEmailAction(to: string) {
     const settings = await getEmailSettings();
     const recipient = to.trim() || settings.testRecipient;
     if (!recipient) throw new ValidationError("請輸入測試收件人");
+    if (settings.provider === "console") {
+      throw new ValidationError("網站目前未設定寄信服務（EMAIL_PROVIDER=console），不會實際寄出。免費版請改用 GitHub「每日提醒」排程手動執行測試。");
+    }
     await sendTestEmail(recipient);
     await writeAudit({ actorId: admin.id, action: "EMAIL_TEST_SEND", entityType: "SystemSetting", summary: `寄送測試信至 ${recipient}` });
   }, "測試信已送出，請至收件匣確認");
