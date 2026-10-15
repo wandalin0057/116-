@@ -42,6 +42,54 @@
   }
 }
 
+/* Email 簽名檔編輯器（Tiptap） */
+.signature-editor p {
+  margin: 0;
+  min-height: 1.2em;
+}
+.signature-editor a {
+  color: #0563c1;
+  text-decoration: underline;
+}
+.signature-editor img {
+  max-width: 100%;
+  height: auto;
+}
+.signature-editor img.ProseMirror-selectednode,
+.signature-editor [data-resize-container].ProseMirror-selectednode img {
+  outline: 2px solid hsl(var(--primary));
+}
+.signature-editor [data-resize-container] {
+  justify-content: flex-start;
+}
+.signature-editor [data-resize-handle] {
+  z-index: 10;
+  opacity: 0;
+}
+.signature-editor [data-resize-handle="bottom-right"],
+.signature-editor [data-resize-handle="bottom-left"] {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: hsl(var(--primary));
+  border: 1px solid white;
+}
+.signature-editor [data-resize-handle="bottom-right"] {
+  cursor: nwse-resize;
+}
+.signature-editor [data-resize-handle="bottom-left"] {
+  cursor: nesw-resize;
+}
+.signature-editor [data-resize-handle="right"] {
+  width: 6px;
+  cursor: ew-resize;
+}
+.signature-editor [data-resize-container]:hover [data-resize-handle],
+.signature-editor [data-resize-container].ProseMirror-selectednode [data-resize-handle],
+.signature-editor [data-resize-state="true"] [data-resize-handle] {
+  opacity: 1;
+}
+
 @media print {
   .no-print {
     display: none !important;

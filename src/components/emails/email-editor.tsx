@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DeleteEmailDraftButton } from "./delete-email-draft-button";
-import { buildEmailHtml, signatureText, type SignatureData } from "@/lib/signature";
+import { buildEmailHtml, signatureText, type FormattedSignature } from "@/lib/signature";
 
 interface Draft {
   id: string;
@@ -33,7 +33,7 @@ function withUrl(d: Draft) {
 }
 
 /** 純文字內文：代入下載連結與簽名檔文字 */
-function renderBody(d: Draft, sig: SignatureData | null) {
+function renderBody(d: Draft, sig: FormattedSignature | null) {
   return withUrl(d).split("{signature}").join(signatureText(sig));
 }
 
@@ -67,7 +67,7 @@ function RichCopyButton({ html, text, hasImage }: { html: string; text: string; 
   );
 }
 
-function mailto(d: Draft, sig: SignatureData | null) {
+function mailto(d: Draft, sig: FormattedSignature | null) {
   const split = (s: string) => s.split(/[,;，；\s]+/).filter(Boolean).join(",");
   const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(renderBody(d, sig))}`];
   if (d.ccRecipients) q.unshift(`cc=${encodeURIComponent(split(d.ccRecipients))}`);
@@ -85,7 +85,7 @@ export function EmailEditor({
   canEdit: boolean;
   schoolName: string;
   isAdmin?: boolean;
-  signature?: SignatureData | null;
+  signature?: FormattedSignature | null;
 }) {
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -170,7 +170,7 @@ export function EmailEditor({
             )}
             <CopyButton text={d.toRecipients} label="複製收件人" />
             <CopyButton text={d.subject} label="複製主旨" />
-            <RichCopyButton html={buildEmailHtml(withUrl(d), signature)} text={renderBody(d, signature)} hasImage={!!signature?.image} />
+            <RichCopyButton html={buildEmailHtml(withUrl(d), signature)} text={renderBody(d, signature)} hasImage={!!signature?.html.includes("<img")} />
             <CopyButton text={() => renderBody(d, signature)} label="複製純文字" />
             <Button asChild variant="outline" size="sm">
               <a href={mailto(d, signature)}>
@@ -214,7 +214,7 @@ export function EmailEditor({
               // 內容由 buildEmailHtml 產生：內文已跳脫、樣式經白名單驗證
               dangerouslySetInnerHTML={{ __html: buildEmailHtml(withUrl(d), signature) }}
             />
-            {signature?.image && <p className="text-xs text-muted-foreground">「以郵件程式開啟」只能帶入文字；要含簽名圖片與樣式，請用「複製內文（含簽名圖片）」再貼到 Outlook。</p>}
+            {signature?.html.includes("<img") && <p className="text-xs text-muted-foreground">「以郵件程式開啟」只能帶入文字；要含簽名圖片與樣式，請用「複製內文（含簽名圖片）」再貼到 Outlook。</p>}
           </CardContent>
         </Card>
         {canEdit && d.status === "DRAFT" && (

@@ -55,7 +55,6 @@ export interface SignatureData {
 }
 
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-const linkify = (s: string) => s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
 const isSafeImage = (src: string) => /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(src);
 
 /** 簽名檔 HTML：第一行（姓名職稱）可獨立設定大小顏色粗體 */
@@ -65,7 +64,7 @@ export function signatureHtml(sig: SignatureData): string {
   const lines = sig.text.replace(/\r\n/g, "\n").split("\n");
   const textHtml = lines
     .map((line, i) => {
-      const content = linkify(escapeHtml(line)) || "&nbsp;";
+      const content = linkifyEscaped(escapeHtml(line)) || "&nbsp;";
       return i === 0
         ? `<div style="font-size:${s.firstLineSizePt}pt;color:${s.firstLineColor};${s.firstLineBold ? "font-weight:bold;" : ""}">${content}</div>`
         : `<div>${content}</div>`;
@@ -79,23 +78,35 @@ export function signatureHtml(sig: SignatureData): string {
   return s.imagePosition === "above" ? img + text : text + img;
 }
 
+/** 已格式化之簽名檔（html 已於伺服器端過濾） */
+export interface FormattedSignature {
+  html: string;
+  text: string;
+}
+
 /** 純文字版本中 {signature} 的替代文字 */
-export function signatureText(sig: SignatureData | null, fallback = ""): string {
+export function signatureText(sig: FormattedSignature | null, fallback = ""): string {
   return sig?.text.trim() || fallback;
 }
 
+/** 網址與 Email 轉為超連結（輸入須為已跳脫之文字） */
+/** 超連結樣式（Outlook 預設的藍色底線） */
+export const LINK_STYLE = "color:#0563c1;text-decoration:underline";
+
+export function linkifyEscaped(s: string): string {
+  return s
+    .replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" style="${LINK_STYLE}">$1</a>`)
+    .replace(/(^|[\s>（(：:，,])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![^<]*<\/a>)/g, `$1<a href="mailto:$2" style="${LINK_STYLE}">$2</a>`);
+}
+
 /**
- * Email 內文轉 HTML：內文保留換行、網址轉連結；{signature} 換成樣式化簽名檔。
- * 內文沒有 {signature}（舊草稿）時，簽名圖片接在最後。
+ * Email 內文轉 HTML：內文保留換行、網址與 Email 轉超連結；{signature} 換成格式化簽名檔。
  */
-export function buildEmailHtml(body: string, sig: SignatureData | null): string {
-  const part = (t: string) => linkify(escapeHtml(t)).replace(/\n/g, "<br>");
-  const segments = body.split("{signature}");
-  let html: string;
-  if (segments.length > 1) {
-    html = segments.map(part).join(sig ? signatureHtml(sig) : "");
-  } else {
-    html = part(body) + (sig?.image ? signatureHtml({ ...sig, text: "" }) : "");
-  }
+export function buildEmailHtml(body: string, sig: FormattedSignature | null): string {
+  const part = (t: string) => linkifyEscaped(escapeHtml(t)).replace(/\n/g, "<br>");
+  const html = body
+    .split("{signature}")
+    .map(part)
+    .join(sig ? `<div style="line-height:1.4">${sig.html}</div>` : "");
   return `<div style="font-family:${SIGNATURE_FONTS.jhenghei.css};font-size:12pt">${html}</div>`;
 }

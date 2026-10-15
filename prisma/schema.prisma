@@ -36,6 +36,8 @@ model User {
   signatureImage    String?
   // 簽名檔樣式（字型、大小、顏色、圖片寬度與位置）
   signatureStyle    Json?
+  // 簽名檔（格式化 HTML，已於伺服器端以白名單過濾）
+  signatureHtml     String?
   createdAt         DateTime  @default(now()) @db.Timestamptz
   updatedAt         DateTime  @updatedAt @db.Timestamptz
 

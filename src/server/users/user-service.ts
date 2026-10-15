@@ -1,6 +1,7 @@
 import type { UserRole } from "@prisma/client";
 import { z } from "zod";
-import { normalizeSignatureStyle, signatureStyleSchema } from "@/lib/signature";
+import { signatureHtml as legacySignatureHtml, normalizeSignatureStyle, signatureStyleSchema } from "@/lib/signature";
+import { SIGNATURE_HTML_MAX_CHARS, sanitizeSignatureHtml, signatureHtmlToText } from "@/server/signature/sanitize";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/server/audit/audit";
 import { hashPassword, validatePasswordStrength, verifyPassword } from "@/server/auth/password";
@@ -163,9 +164,36 @@ export async function saveSignature(user: AuthUser, input: { text: string; image
   await writeAudit({ actorId: user.id, action: "USER_SIGNATURE_UPDATE", entityType: "User", entityId: user.id, summary: "更新 Email 簽名檔（文字、圖片、樣式）" });
 }
 
-/** 取得使用者簽名檔（Email 草稿使用） */
-export async function getSignature(userId: string) {
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { emailSignature: true, signatureImage: true, signatureStyle: true, name: true } });
-  if (!u) return null;
-  return { text: u.emailSignature ?? u.name, image: u.signatureImage, style: normalizeSignatureStyle(u.signatureStyle) };
+/** 儲存格式化簽名檔（HTML 經白名單過濾；同時保存純文字版本） */
+export async function saveSignatureHtml(user: AuthUser, rawHtml: string) {
+  if (rawHtml.length > SIGNATURE_HTML_MAX_CHARS) throw new ValidationError("簽名檔太大（多半是圖片過大），請換較小的圖片");
+  const html = sanitizeSignatureHtml(rawHtml);
+  const text = signatureHtmlToText(html);
+  const empty = !text && !html.includes("<img");
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { signatureHtml: empty ? null : html, emailSignature: text || null },
+  });
+  await writeAudit({ actorId: user.id, action: "USER_SIGNATURE_UPDATE", entityType: "User", entityId: user.id, summary: "更新 Email 簽名檔" });
+  return html;
 }
+
+/** 使用者簽名檔的 HTML（新版格式化簽名；舊版設定自動轉換） */
+export function resolveSignatureHtml(u: { signatureHtml: string | null; emailSignature: string | null; signatureImage: string | null; signatureStyle: unknown }): string {
+  if (u.signatureHtml) return sanitizeSignatureHtml(u.signatureHtml);
+  if (!u.emailSignature && !u.signatureImage) return "";
+  return legacySignatureHtml({ text: u.emailSignature ?? "", image: u.signatureImage, style: normalizeSignatureStyle(u.signatureStyle) });
+}
+
+/** 取得使用者簽名檔（Email 草稿使用） */
+export async function getSignature(userId: string): Promise<{ html: string; text: string } | null> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { emailSignature: true, signatureImage: true, signatureStyle: true, signatureHtml: true, name: true },
+  });
+  if (!u) return null;
+  const html = resolveSignatureHtml(u);
+  return { html: html || escapeHtmlText(u.name), text: u.emailSignature?.trim() || u.name };
+}
+
+const escapeHtmlText = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
