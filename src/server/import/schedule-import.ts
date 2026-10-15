@@ -169,9 +169,9 @@ export async function applyScheduleImport(user: AuthUser, files: ImportFile[], o
       };
       const { schoolCase } = existing ? await updateCase(user, existing.id, input) : await createCase(user, input);
 
-      // 交初規 → 事前規劃報告書發文期限（與系統計算不同時鎖定為排程表日期）
+      // 交初規 → 提供事前規劃報告書期限（與系統計算不同時鎖定為排程表日期）
       if (r.preReportDate) {
-        const t = await prisma.task.findUnique({ where: { caseId_taskType: { caseId: schoolCase.id, taskType: "PRE_REPORT_DISPATCH" } } });
+        const t = await prisma.task.findUnique({ where: { caseId_taskType: { caseId: schoolCase.id, taskType: "PRE_REPORT_PROVIDE" } } });
         const due = t ? dbDateToISOOrNull(t.overrideDueDate ?? t.calculatedDueDate) : null;
         if (t && due !== r.preReportDate) {
           await setTaskOverride(user, t.id, { overrideDueDate: r.preReportDate, overrideReason: `${REASON}：交初規` });

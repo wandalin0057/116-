@@ -27,7 +27,35 @@ async function seedRules() {
     }
   }
   console.log(`✓ 期限規則 ${DEFAULT_DEADLINE_RULES.length} 筆${added.length ? `（新增 ${added.join("、")}）` : ""}`);
-  if (added.length) await backfillNewTasks();
+  const upgraded = await upgradeRules();
+  if (added.length || upgraded) await backfillNewTasks();
+}
+
+/** 預設規則調整：仍為舊版預設值（未被管理員修改）者更新為新版，回傳是否有更新 */
+async function upgradeRules(): Promise<boolean> {
+  const next = DEFAULT_DEADLINE_RULES.find((r) => r.taskType === "PRE_REPORT_PROVIDE")!;
+  const r = await prisma.deadlineRule.updateMany({
+    where: { taskType: "PRE_REPORT_PROVIDE", anchor: "PRE_REPORT_DISPATCH", offsetBusinessDays: -2 },
+    data: { anchor: next.anchor, offsetBusinessDays: next.offsetBusinessDays, description: next.description },
+  });
+  if (!r.count) return false;
+  await prisma.task.updateMany({
+    where: { taskType: "PRE_REPORT_PROVIDE", description: "事前規劃報告書提供圖說前第 2 個工作天，由負責同事提供報告書" },
+    data: { description: next.description },
+  });
+  // 已完成的工作也依新規則更新顯示日期（暫時改為未開始以重新計算，之後恢復完成狀態與完成時間）
+  const done = await prisma.task.findMany({
+    where: { taskType: "PRE_REPORT_PROVIDE", status: "COMPLETED", overrideDueDate: null },
+    select: { id: true, caseId: true, actualCompletedAt: true },
+  });
+  const { syncCaseTasks } = await import("../src/server/schedule/task-sync");
+  for (const t of done) {
+    await prisma.task.update({ where: { id: t.id }, data: { status: "NOT_STARTED" } });
+    await syncCaseTasks(t.caseId, { actorId: null, source: "RULE_CHANGE", reason: "期限規則更新" });
+    await prisma.task.update({ where: { id: t.id }, data: { status: "COMPLETED", actualCompletedAt: t.actualCompletedAt } });
+  }
+  console.log("✓ 「提供事前規劃報告書」期限改為機關通知日後第 12 個工作天");
+  return true;
 }
 
 /** 新增期限規則後，為既有案件補建對應工作；後續步驟已完成者，新工作一併標記完成（避免既往案件產生逾期提醒） */
@@ -35,7 +63,7 @@ async function backfillNewTasks() {
   const { syncCaseTasks } = await import("../src/server/schedule/task-sync");
   const cases = await prisma.schoolCase.findMany({ where: { status: { in: ["ACTIVE", "ON_HOLD"] } }, select: { id: true } });
   for (const c of cases) {
-    await syncCaseTasks(c.id, { actorId: null, source: "RULE_CHANGE", reason: "新增期限規則，補建工作" });
+    await syncCaseTasks(c.id, { actorId: null, source: "RULE_CHANGE", reason: "期限規則更新，補建或重新計算工作" });
   }
   const laterDone = await prisma.task.findMany({
     where: { taskType: { in: ["PRE_REPORT_DRAFT", "PRE_REPORT_DISPATCH"] }, status: "COMPLETED" },

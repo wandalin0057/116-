@@ -4,7 +4,7 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   PRE_REPORT_PROVIDE: "提供事前規劃報告書",
   PRE_REPORT_DRAFT: "事前規劃報告書創稿",
   PRE_REPORT_DISPATCH: "事前規劃報告書提供圖說",
-  REVIEW_SLIDES_EMAIL: "寄送審查簡報",
+  REVIEW_SLIDES_EMAIL: "提供審查簡報",
   REVIEW_MEETING: "審查會議",
   REVIEW_MINUTES_EMAIL: "Email 審查會議紀錄",
   REVIEW_DRAWING_DRAFT: "審查後修正圖說創稿",
@@ -79,7 +79,7 @@ export const TASK_COLORS: Record<TaskCategory, { bg: string; text: string; borde
 };
 
 /**
- * 會寄 Email 提醒給負責同事的工作；其餘工作（創稿、發文、會議、紀錄等）只提醒管理員（專案經理）。
+ * 會寄 Email 提醒給負責同事的工作；其餘工作（創稿、提供圖說、會議、紀錄等）只提醒管理員。管理員一律收到全部工作的提醒。
  */
 export const COLLEAGUE_REMINDER_TASKS: TaskType[] = [
   "PRE_REPORT_PROVIDE",

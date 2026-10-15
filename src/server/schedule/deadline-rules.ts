@@ -16,9 +16,9 @@ export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
   {
     taskType: "PRE_REPORT_PROVIDE",
     title: "提供事前規劃報告書",
-    description: "事前規劃報告書提供圖說前第 2 個工作天，由負責同事提供報告書",
-    anchor: "PRE_REPORT_DISPATCH",
-    offsetBusinessDays: -2,
+    description: "機關通知日（D0）後第 12 個工作天，由負責同事提供報告書",
+    anchor: "NOTIFICATION_DATE",
+    offsetBusinessDays: 12,
     enabled: true,
     sortOrder: 3,
   },
@@ -42,8 +42,8 @@ export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
   },
   {
     taskType: "REVIEW_SLIDES_EMAIL",
-    title: "寄送審查簡報給機關",
-    description: "審查會議前第 2 個工作天寄送簡報",
+    title: "提供審查簡報",
+    description: "審查會議前第 2 個工作天提供簡報",
     anchor: "REVIEW_MEETING",
     offsetBusinessDays: -2,
     enabled: true,

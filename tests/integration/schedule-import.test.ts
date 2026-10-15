@@ -57,7 +57,7 @@ describe.skipIf(!hasTestDb)("排程表匯入", () => {
     expect(wanda.projectName).toBe("115年度臺北市通學區規劃分析案");
     expect(wanda.reviewMeetingDateTime?.toISOString()).toBe("2026-10-23T02:00:00.000Z");
 
-    const dispatch = await prisma.task.findUniqueOrThrow({ where: { caseId_taskType: { caseId: wanda.id, taskType: "PRE_REPORT_DISPATCH" } } });
+    const dispatch = await prisma.task.findUniqueOrThrow({ where: { caseId_taskType: { caseId: wanda.id, taskType: "PRE_REPORT_PROVIDE" } } });
     expect(dispatch.overrideDueDate?.toISOString().slice(0, 10)).toBe("2026-10-21");
     expect(dispatch.overrideReason).toMatch(/交初規/);
 
