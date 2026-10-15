@@ -1,5 +1,5 @@
 "use server";
-import { getRequestMeta, requireUserForAction } from "@/lib/auth";
+import { getRequestMeta, requireAdminForAction, requireUserForAction } from "@/lib/auth";
 import { runAction } from "@/lib/action-result";
 import type { CaseInput } from "@/server/cases/case-schema";
 import { createCase, deleteCase, markEventHeld, previewCaseUpdate, setCaseMember, updateCase } from "@/server/cases/case-service";
@@ -37,4 +37,26 @@ export async function markEventHeldAction(caseId: string, kind: "REVIEW_MEETING"
     async () => markEventHeld(await requireUserForAction(), caseId, kind, { attendees: info.attendees || null, notes: info.notes || null }),
     kind === "REVIEW_MEETING" ? "已標記審查會議辦理完成" : "已標記會勘辦理完成",
   );
+}
+
+// ── 排程表匯入（Excel） ──
+async function filesFrom(form: FormData) {
+  const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+  return Promise.all(files.map(async (f) => ({ name: f.name, data: await f.arrayBuffer() })));
+}
+
+export async function previewScheduleImportAction(form: FormData) {
+  return runAction(async () => {
+    await requireAdminForAction();
+    const { previewScheduleImport } = await import("@/server/import/schedule-import");
+    return previewScheduleImport(await filesFrom(form));
+  });
+}
+
+export async function applyScheduleImportAction(form: FormData) {
+  return runAction(async () => {
+    const user = await requireAdminForAction();
+    const { applyScheduleImport } = await import("@/server/import/schedule-import");
+    return applyScheduleImport(user, await filesFrom(form), { completePast: form.get("completePast") === "1" });
+  });
 }

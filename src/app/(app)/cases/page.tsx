@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
 import Link from "next/link";
 import { ListControls } from "@/components/common/list-controls";
 import { EmptyState, PageHeader } from "@/components/common/page-header";
@@ -62,12 +62,22 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         title="學校案件"
         description="每所學校一筆案件；點選案件可查看期程、公文與 Email 草稿。"
         actions={
-          <Button asChild>
-            <Link href={sp.projectName ? `/cases/new?project=${encodeURIComponent(sp.projectName)}` : "/cases/new"}>
-              <Plus />
-              新增案件
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            {admin && (
+              <Button asChild variant="outline">
+                <Link href="/cases/import">
+                  <FileSpreadsheet />
+                  匯入排程（Excel）
+                </Link>
+              </Button>
+            )}
+            <Button asChild>
+              <Link href={sp.projectName ? `/cases/new?project=${encodeURIComponent(sp.projectName)}` : "/cases/new"}>
+                <Plus />
+                新增案件
+              </Link>
+            </Button>
+          </div>
         }
       />
       <div className="mb-3 flex gap-1 overflow-x-auto rounded-lg border bg-white p-1">
