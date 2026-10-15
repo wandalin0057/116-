@@ -1,4 +1,19 @@
-import { dbDateToISOOrNull, formatROC } from "@/lib/dates";
+import { dbDateToISOOrNull, parseISODate } from "@/lib/dates";
+
+/** 發文單位聯絡資訊（公文抬頭下方） */
+export interface LayoutOrganization {
+  address?: string;
+  contactName?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+}
+
+/** 中華民國115年10月07日（公文發文日期格式，月日補零） */
+export function formatDispatchDate(iso: string): string {
+  const { year, month, day } = parseISODate(iso);
+  return `中華民國${year - 1911}年${String(month).padStart(2, "0")}月${String(day).padStart(2, "0")}日`;
+}
 import { DOCUMENT_STATUS_LABELS } from "./document-variables";
 
 /**
@@ -9,6 +24,7 @@ export const DRAFT_NOTICE = "【草稿】本文件為系統產生之排版草稿
 
 export interface DocumentLayoutInput {
   companyName: string;
+  organization?: LayoutOrganization;
   status: keyof typeof DOCUMENT_STATUS_LABELS;
   recipient: string | null;
   dispatchDate: Date | null;
@@ -22,6 +38,10 @@ export interface DocumentLayoutInput {
 
 export interface DocumentLayout {
   title: string;
+  /** 檔號、保存年限（右上角） */
+  fileFields: { label: string; value: string }[];
+  /** 地址、聯絡人、電話、傳真、電子郵件 */
+  orgLines: { label: string; value: string }[];
   notice: string;
   statusLabel: string;
   headerFields: { label: string; value: string }[];
@@ -41,11 +61,22 @@ export function buildDocumentLayout(input: DocumentLayoutInput): DocumentLayout 
   const dispatch = dbDateToISOOrNull(input.dispatchDate);
   return {
     title: `${input.companyName}　函`,
+    fileFields: [
+      { label: "檔　　號", value: "" },
+      { label: "保存年限", value: "" },
+    ],
+    orgLines: [
+      { label: "地址", value: input.organization?.address ?? "" },
+      { label: "聯絡人", value: input.organization?.contactName ?? "" },
+      { label: "電話", value: input.organization?.phone ?? "" },
+      { label: "傳真", value: input.organization?.fax ?? "" },
+      { label: "電子郵件", value: input.organization?.email ?? "" },
+    ].filter((l) => l.value),
     notice: DRAFT_NOTICE,
     statusLabel: DOCUMENT_STATUS_LABELS[input.status],
     headerFields: [
       { label: "受文者", value: input.recipient ?? "" },
-      { label: "發文日期", value: dispatch ? `中華民國${formatROC(dispatch)}` : "" },
+      { label: "發文日期", value: dispatch ? formatDispatchDate(dispatch) : "" },
       // 正式發文字號由使用者輸入，未輸入前保持空白
       { label: "發文字號", value: input.documentNumber ?? "" },
       { label: "速別", value: "普通件" },

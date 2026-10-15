@@ -70,6 +70,7 @@ function toDbFields(p: ResolvedCase) {
     agencyEmail: p.agencyEmail,
     responsibleUserId: p.responsibleUserId,
     notificationDate: p.notificationDate ? isoToDbDate(p.notificationDate) : null,
+    notificationRound: p.notificationRound,
     reviewMeetingDateTime: p.reviewMeetingDateTime ? parseTaipeiDateTime(p.reviewMeetingDateTime) : null,
     reviewMeetingLocation: p.reviewMeetingLocation,
     siteVisitDateTime: p.siteVisitDateTime ? parseTaipeiDateTime(p.siteVisitDateTime) : null,

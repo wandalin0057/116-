@@ -9,6 +9,7 @@ import { buildEmailVariables } from "@/server/documents/document-variables";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/server/errors";
 import { isAdmin } from "@/server/auth/types";
 import { orderBy } from "@/server/query-utils";
+import { getOrganization } from "@/server/settings/settings-service";
 import { renderTemplate } from "@/server/templates/template-renderer";
 import { getActiveTemplate } from "@/server/templates/template-service";
 
@@ -47,7 +48,10 @@ export async function createEmailDraft(user: AuthUser, input: { caseId: string; 
   await assertCaseAccess(user, input.caseId, "edit");
   if (!(input.templateType in EMAIL_TASK)) throw new ValidationError("Email 範本類型錯誤");
   const schoolCase = await prisma.schoolCase.findUniqueOrThrow({ where: { id: input.caseId } });
-  const sender = await prisma.user.findUnique({ where: { id: user.id }, select: { name: true } });
+  const [sender, org] = await Promise.all([
+    prisma.user.findUnique({ where: { id: user.id }, select: { name: true, emailSignature: true } }),
+    getOrganization(),
+  ]);
   const template = await getActiveTemplate(input.templateType);
   const isSiteVisit = input.templateType === "SITE_VISIT_MINUTES_EMAIL";
   const eventDateTime = isSiteVisit ? schoolCase.siteVisitDateTime : schoolCase.reviewMeetingDateTime;
@@ -57,9 +61,13 @@ export async function createEmailDraft(user: AuthUser, input: { caseId: string; 
     eventDateTime,
     eventLocation: isSiteVisit ? schoolCase.siteVisitLocation : schoolCase.reviewMeetingLocation,
     attachmentNames,
-    companyName: process.env.COMPANY_NAME,
+    companyName: org.companyName,
     senderName: sender?.name,
+    signature: sender?.emailSignature,
+    notificationRound: schoolCase.notificationRound,
   });
+  // 下載連結於草稿頁填寫，內文保留 {attachmentUrl} 於預覽／複製時代入
+  const keep = ["attachmentUrl"];
   const taskId =
     input.taskId ??
     (await prisma.task.findUnique({ where: { caseId_taskType: { caseId: input.caseId, taskType: EMAIL_TASK[input.templateType] } }, select: { id: true } }))?.id ??
@@ -71,8 +79,8 @@ export async function createEmailDraft(user: AuthUser, input: { caseId: string; 
       templateId: template.id,
       templateType: input.templateType,
       toRecipients: schoolCase.agencyEmail ?? "",
-      subject: renderTemplate(template.subject, vars).text,
-      body: renderTemplate(template.body, vars).text,
+      subject: renderTemplate(template.subject, vars, { keep }).text,
+      body: renderTemplate(template.body, vars, { keep }).text,
       attachmentNames,
       eventDateTime,
       status: "DRAFT",
@@ -97,6 +105,7 @@ export const emailDraftUpdateSchema = z.object({
   subject: z.string().trim().min(1, "請輸入主旨").max(500),
   body: z.string().trim().min(1, "請輸入內文").max(20000),
   attachmentNames: z.string().trim().max(1000).optional(),
+  attachmentUrl: z.string().trim().max(2000).optional().refine((v) => !v || /^https?:\/\//i.test(v), "下載連結需以 http:// 或 https:// 開頭"),
   eventDateTime: z.string().optional(),
 });
 
@@ -116,6 +125,7 @@ export async function updateEmailDraft(user: AuthUser, id: string, input: z.inpu
       subject: p.subject,
       body: p.body,
       attachmentNames: p.attachmentNames || null,
+      attachmentUrl: p.attachmentUrl || null,
       eventDateTime: p.eventDateTime ? parseTaipeiDateTime(p.eventDateTime) : draft.eventDateTime,
       // 儲存草稿永遠維持 DRAFT 狀態，不會寄出
       status: "DRAFT",

@@ -1,4 +1,4 @@
-import { Archive, Bell, CalendarCog, FileStack, History, KeyRound, RefreshCw, Scale, Users } from "lucide-react";
+import { Archive, Bell, Building2, CalendarCog, FileStack, History, KeyRound, RefreshCw, Scale, Users } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/common/page-header";
 import { requireUser } from "@/lib/auth";
@@ -7,8 +7,9 @@ import { isAdmin } from "@/server/auth/types";
 export const metadata = { title: "系統設定" };
 
 const ITEMS = [
-  { href: "/settings/account", label: "個人帳號", desc: "變更登入密碼", icon: KeyRound, admin: false },
+  { href: "/settings/account", label: "個人帳號", desc: "Email 簽名檔、變更登入密碼", icon: KeyRound, admin: false },
   { href: "/settings/notifications", label: "通知設定", desc: "每日提醒、提前天數、逾期通知；管理員可設定 Email 測試模式", icon: Bell, admin: false },
+  { href: "/settings/organization", label: "發文單位資訊", desc: "公文抬頭的公司名稱、地址、聯絡人、電話、傳真、電子郵件", icon: Building2, admin: true },
   { href: "/settings/users", label: "使用者管理", desc: "新增、停用使用者與重設密碼", icon: Users, admin: true },
   { href: "/settings/calendar", label: "工作天設定", desc: "官方辦公日曆匯入、休假日／補行上班日調整", icon: CalendarCog, admin: true },
   { href: "/settings/recalculate", label: "期限重新計算", desc: "日曆或規則更新後，預覽差異並套用", icon: RefreshCw, admin: true },

@@ -5,7 +5,23 @@ export function DocumentPreview({ layout }: { layout: DocumentLayout }) {
   return (
     <div className="mx-auto max-w-[210mm] bg-white p-8 font-serif text-[15px] leading-relaxed text-black shadow-sm print:p-0 print:shadow-none" style={{ fontFamily: '"DFKai-SB","BiauKai","標楷體","Noto Serif TC",serif' }}>
       <p className="text-right text-xs text-red-700">草稿（{layout.statusLabel}）</p>
+      <div className="ml-auto w-fit text-sm">
+        {layout.fileFields.map((f) => (
+          <p key={f.label}>
+            {f.label}：{f.value}
+          </p>
+        ))}
+      </div>
       <h2 className="my-4 text-center text-2xl font-bold tracking-widest">{layout.title}</h2>
+      {layout.orgLines.length > 0 && (
+        <div className="mb-4 ml-auto w-fit max-w-[60%] text-sm">
+          {layout.orgLines.map((l) => (
+            <p key={l.label}>
+              {l.label}：{l.value}
+            </p>
+          ))}
+        </div>
+      )}
       <div className="space-y-0.5 text-sm">
         {layout.headerFields.map((f) => (
           <p key={f.label}>

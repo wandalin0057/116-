@@ -123,3 +123,10 @@ export async function updateReminderPreference(user: AuthUser, input: z.input<ty
   await prisma.reminderPreference.upsert({ where: { userId: user.id }, create: { userId: user.id, ...data }, update: data });
   await writeAudit({ actorId: user.id, action: "REMINDER_PREF_UPDATE", entityType: "ReminderPreference", entityId: user.id, summary: "更新個人通知設定", changes: p.data });
 }
+
+export async function updateEmailSignature(user: AuthUser, signature: string) {
+  const value = signature.replace(/\r\n/g, "\n").trim();
+  if (value.length > 1000) throw new ValidationError("簽名檔不可超過 1000 字");
+  await prisma.user.update({ where: { id: user.id }, data: { emailSignature: value || null } });
+  await writeAudit({ actorId: user.id, action: "USER_SIGNATURE_UPDATE", entityType: "User", entityId: user.id, summary: "更新 Email 簽名檔" });
+}

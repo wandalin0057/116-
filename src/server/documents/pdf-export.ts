@@ -35,9 +35,19 @@ export async function renderPdf(layout: DocumentLayout): Promise<Buffer> {
 
   const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   doc.fontSize(9).fillColor("#B91C1C").text(`草稿（${layout.statusLabel}）`, { align: "right" });
-  doc.moveDown(0.5);
-  doc.fillColor("#000").fontSize(20).text(layout.title, { align: "center" });
-  doc.moveDown(1);
+  doc.fillColor("#000").fontSize(12);
+  const fileX = doc.page.margins.left + width * 0.62;
+  for (const f of layout.fileFields) doc.text(`${f.label}：${f.value}`, fileX, doc.y);
+  doc.moveDown(0.6);
+  doc.fontSize(20).text(layout.title, doc.page.margins.left, doc.y, { width, align: "center" });
+  doc.moveDown(0.6);
+  if (layout.orgLines.length) {
+    doc.fontSize(12);
+    const orgX = doc.page.margins.left + width * 0.45;
+    for (const l of layout.orgLines) doc.text(`${l.label}：${l.value}`, orgX, doc.y, { width: width * 0.55 });
+    doc.moveDown(0.8);
+  }
+  doc.x = doc.page.margins.left;
   doc.fontSize(12);
   for (const f of layout.headerFields) doc.text(`${f.label}：${f.value}`, { lineGap: 3 });
   doc.moveDown(1);

@@ -47,6 +47,7 @@ export default async function EmailPage({ params }: { params: Promise<{ id: stri
           subject: draft.subject,
           body: draft.body,
           attachmentNames: draft.attachmentNames ?? "",
+          attachmentUrl: draft.attachmentUrl ?? "",
           eventDateTime: toTaipeiDateTimeInput(draft.eventDateTime),
           agencyContact: draft.schoolCase.agencyContact ?? "",
         }}

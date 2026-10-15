@@ -2,15 +2,17 @@ import { dbDateToISOOrNull } from "@/lib/dates";
 import type { AuthUser } from "@/server/auth/types";
 import { writeAudit } from "@/server/audit/audit";
 import { buildDocumentLayout } from "./document-layout";
+import { getOrganization } from "@/server/settings/settings-service";
 import { getDocumentForEdit, renderDocumentContent } from "./document-service";
 import { DOCUMENT_TYPE_LABELS } from "./document-variables";
 
 /** 取得匯出／列印用排版資料（含權限檢查） */
 export async function getDocumentLayout(user: AuthUser, id: string) {
-  const doc = await getDocumentForEdit(user, id);
-  const content = renderDocumentContent(doc);
+  const [doc, org] = await Promise.all([getDocumentForEdit(user, id), getOrganization()]);
+  const content = renderDocumentContent(doc, org.companyName);
   const layout = buildDocumentLayout({
-    companyName: process.env.COMPANY_NAME ?? "○○交通工程顧問有限公司",
+    companyName: org.companyName,
+    organization: org,
     status: doc.status,
     recipient: doc.recipient,
     dispatchDate: doc.dispatchDate,

@@ -1,10 +1,17 @@
 "use client";
 import { Loader2, Save, Send } from "lucide-react";
 import { useState } from "react";
-import { changeOwnPasswordAction, sendTestEmailAction, updateEmailSettingsAction, updateReminderPreferenceAction } from "@/app/actions/settings";
+import {
+  changeOwnPasswordAction,
+  sendTestEmailAction,
+  updateEmailSettingsAction,
+  updateEmailSignatureAction,
+  updateOrganizationAction,
+  updateReminderPreferenceAction,
+} from "@/app/actions/settings";
 import { useAction } from "@/components/common/use-action";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function ChangePasswordForm() {
@@ -144,5 +151,55 @@ export function EmailSettingsForm({ initial }: { initial: { testMode: boolean; t
         </Button>
       </div>
     </div>
+  );
+}
+
+export function SignatureForm({ initial, placeholder }: { initial: string; placeholder: string }) {
+  const [v, setV] = useState(initial);
+  const { run, pending } = useAction();
+  return (
+    <div className="max-w-lg space-y-3">
+      <Textarea rows={7} value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} aria-label="Email 簽名檔" />
+      <p className="text-xs text-muted-foreground">會放在 Email 草稿內文的最後面（範本中的 {"{signature}"}）。已建立的草稿不會改變。</p>
+      <Button disabled={pending || v === initial} onClick={() => run(() => updateEmailSignatureAction(v))}>
+        {pending ? <Loader2 className="animate-spin" /> : <Save />}
+        儲存簽名檔
+      </Button>
+    </div>
+  );
+}
+
+type Org = { companyName: string; address: string; contactName: string; phone: string; fax: string; email: string };
+
+export function OrganizationForm({ initial }: { initial: Org }) {
+  const [v, setV] = useState(initial);
+  const { run, pending } = useAction();
+  const field = (k: keyof Org, label: string, placeholder: string) => (
+    <div className="space-y-1.5">
+      <Label htmlFor={`org-${k}`}>{label}</Label>
+      <Input id={`org-${k}`} value={v[k]} placeholder={placeholder} onChange={(e) => setV((s) => ({ ...s, [k]: e.target.value }))} />
+    </div>
+  );
+  return (
+    <form
+      className="grid max-w-2xl gap-3 sm:grid-cols-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void run(() => updateOrganizationAction(v));
+      }}
+    >
+      <div className="sm:col-span-2">{field("companyName", "公司名稱（公文抬頭）", "○○工程顧問股份有限公司")}</div>
+      <div className="sm:col-span-2">{field("address", "地址", "110048 臺北市信義區○○路○號○樓")}</div>
+      {field("contactName", "聯絡人", "王小明")}
+      {field("phone", "電話", "02-2748-8822#6685")}
+      {field("fax", "傳真", "02-2748-6600")}
+      {field("email", "電子郵件", "name@company.com.tw")}
+      <div className="sm:col-span-2">
+        <Button type="submit" disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" /> : <Save />}
+          儲存發文單位資訊
+        </Button>
+      </div>
+    </form>
   );
 }

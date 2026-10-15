@@ -12,7 +12,7 @@ import {
 } from "@/server/business-days/calendar-admin-service";
 import { runDailyReminders, sendTestEmail } from "@/server/reminders/reminder-job";
 import { previewRuleChange, updateRule, type RuleInput } from "@/server/schedule/rule-service";
-import { getEmailSettings, updateEmailSettings } from "@/server/settings/settings-service";
+import { getEmailSettings, updateEmailSettings, updateOrganization } from "@/server/settings/settings-service";
 import { activateTemplateVersion, saveTemplateVersion } from "@/server/templates/template-service";
 import { ValidationError } from "@/server/errors";
 import { writeAudit } from "@/server/audit/audit";
@@ -20,6 +20,7 @@ import {
   changeOwnPassword,
   createUser,
   resetUserPassword,
+  updateEmailSignature,
   updateReminderPreference,
   updateUser,
 } from "@/server/users/user-service";
@@ -37,6 +38,12 @@ export async function updateUserAction(id: string, input: { name: string; role: 
 }
 export async function resetUserPasswordAction(id: string, password: string) {
   return runAction(async () => resetUserPassword(await requireAdminForAction(), id, password), "密碼已重設，該使用者需重新登入");
+}
+export async function updateEmailSignatureAction(signature: string) {
+  return runAction(async () => updateEmailSignature(await requireUserForAction(), signature), "簽名檔已儲存，之後新建立的 Email 草稿會使用");
+}
+export async function updateOrganizationAction(input: { companyName: string; address: string; contactName: string; phone: string; fax: string; email: string }) {
+  return runAction(async () => updateOrganization(await requireAdminForAction(), input), "發文單位資訊已儲存");
 }
 export async function changeOwnPasswordAction(current: string, next: string) {
   return runAction(async () => changeOwnPassword(await requireUserForAction(), current, next), "密碼已變更");

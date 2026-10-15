@@ -252,7 +252,9 @@ export function CaseForm({
           <Field label="機關通知日（D0）" name="notificationDate" error={errors.notificationDate}>
             <Input id="notificationDate" type="date" value={v.notificationDate} onChange={set("notificationDate")} />
           </Field>
-          <div className="hidden md:block" />
+          <Field label="機關第幾次通知" name="notificationRound" error={errors.notificationRound} hint="Email 內文會顯示「第11次通知」">
+            <Input id="notificationRound" inputMode="numeric" value={v.notificationRound} onChange={set("notificationRound")} placeholder="例如：11" />
+          </Field>
           <Field label="審查會議日期時間" name="reviewMeetingDateTime" error={errors.reviewMeetingDateTime}>
             <Input id="reviewMeetingDateTime" type="datetime-local" value={v.reviewMeetingDateTime} onChange={set("reviewMeetingDateTime")} />
           </Field>

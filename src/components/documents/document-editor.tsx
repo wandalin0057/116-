@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatROC, taipeiToday } from "@/lib/dates";
-import { buildDocumentLayout } from "@/server/documents/document-layout";
+import { buildDocumentLayout, type LayoutOrganization } from "@/server/documents/document-layout";
 import { splitBodyLines } from "@/server/documents/document-variables";
 import { renderTemplate } from "@/server/templates/template-renderer";
 import { DeleteDocumentButton } from "./delete-document-button";
@@ -48,6 +48,7 @@ export function DocumentEditor({
   template,
   baseVars,
   companyName,
+  organization,
   schoolName,
   isAdmin = false,
 }: {
@@ -56,6 +57,7 @@ export function DocumentEditor({
   template: { subject: string; body: string };
   baseVars: Record<string, string>;
   companyName: string;
+  organization?: LayoutOrganization;
   schoolName: string;
   isAdmin?: boolean;
 }) {
@@ -84,6 +86,7 @@ export function DocumentEditor({
   const missing = [...new Set([...subject.missing, ...body.missing])];
   const layout = buildDocumentLayout({
     companyName,
+    organization,
     status: d.status,
     recipient: d.recipient,
     dispatchDate: d.dispatchDate ? new Date(`${d.dispatchDate}T00:00:00Z`) : null,

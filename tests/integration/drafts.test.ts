@@ -26,7 +26,8 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     const draft = await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_SLIDES_EMAIL" });
     expect(draft.status).toBe("DRAFT");
     expect(draft.toRecipients).toBe("agency@example.com");
-    expect(draft.body).toContain("張承辦 您好");
+    expect(draft.body).toContain("您好，");
+    expect(draft.body).toContain("{attachmentUrl}");
     await updateEmailDraft(u, draft.id, { toRecipients: "agency@example.com", subject: draft.subject, body: draft.body + "\n補充" });
     expect((await prisma.emailDraft.findUniqueOrThrow({ where: { id: draft.id } })).status).toBe("DRAFT");
     // 未勾選確認不可標記
@@ -59,7 +60,8 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     expect(raw.body).not.toContain("Secret99");
     const full = await getDocumentForEdit(u, doc.id);
     const content = renderDocumentContent(full);
-    expect(content.bodyLines[2]).toBe("三、附件網址：https://files.example.com/x，下載密碼：Secret99（請於115年11月30日前下載）。");
+    expect(content.bodyLines[1]).toBe("二、附件網址：https://files.example.com/x，下載密碼：Secret99(請於115年11月30日前下載)。");
+    expect(doc.recipient).toBe("如行文單位");
 
     await markDocumentDrafted(u, doc.id);
     const draftTask = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DRAFT" } });

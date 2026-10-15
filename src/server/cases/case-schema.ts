@@ -67,6 +67,12 @@ export const caseInputSchema = z.object({
     .refine((v) => !v || z.string().email().safeParse(v).success, "負責人 Email 格式錯誤")
     .transform((v) => (v ? v : null)),
   notificationDate: optionalDate,
+  notificationRound: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || /^\d{1,3}$/.test(v), "第幾次通知請填數字")
+    .transform((v) => (v ? Number(v) : null)),
   reviewMeetingDateTime: optionalDateTime,
   reviewMeetingLocation: optionalText(200),
   siteVisitDateTime: optionalDateTime,

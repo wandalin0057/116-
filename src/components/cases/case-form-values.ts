@@ -11,6 +11,7 @@ type CaseRow = {
   agencyEmail: string | null;
   responsibleUserId: string;
   notificationDate: Date | null;
+  notificationRound?: number | null;
   reviewMeetingDateTime: Date | null;
   reviewMeetingLocation: string | null;
   siteVisitDateTime: Date | null;
@@ -36,6 +37,7 @@ export function caseToFormValues(
     responsibleName: defaults.responsible?.name ?? "",
     responsibleEmail: defaults.responsible?.email ?? "",
     notificationDate: dbDateToISOOrNull(c?.notificationDate) ?? "",
+    notificationRound: c?.notificationRound ? String(c.notificationRound) : "",
     reviewMeetingDateTime: toTaipeiDateTimeInput(c?.reviewMeetingDateTime),
     reviewMeetingLocation: c?.reviewMeetingLocation ?? "",
     siteVisitDateTime: toTaipeiDateTimeInput(c?.siteVisitDateTime),

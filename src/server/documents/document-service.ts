@@ -12,6 +12,7 @@ import { orderBy } from "@/server/query-utils";
 import { renderTemplate } from "@/server/templates/template-renderer";
 import { getActiveTemplate } from "@/server/templates/template-service";
 import { buildDocumentVariables, splitBodyLines } from "./document-variables";
+import { getOrganization } from "@/server/settings/settings-service";
 
 const DRAFT_TASK: Record<DocumentType, TaskType> = {
   PRE_REPORT: "PRE_REPORT_DRAFT",
@@ -27,15 +28,13 @@ const DISPATCH_TASK: Record<DocumentType, TaskType> = {
 /** 下載密碼不以明文存入主旨／說明，保留變數，於預覽與匯出時才代入 */
 const KEEP_IN_STORAGE = ["attachmentPassword"];
 
-function companyName() {
-  return process.env.COMPANY_NAME ?? "○○交通工程顧問有限公司";
-}
 
 export async function createDocumentDraft(user: AuthUser, input: { caseId: string; documentType: DocumentType; taskId?: string | null }) {
   await assertCaseAccess(user, input.caseId, "edit");
   const schoolCase = await prisma.schoolCase.findUniqueOrThrow({ where: { id: input.caseId } });
   const template = await getActiveTemplate(input.documentType);
-  const vars = buildDocumentVariables({ schoolCase, companyName: companyName() });
+  const org = await getOrganization();
+  const vars = buildDocumentVariables({ schoolCase, companyName: org.companyName });
   const subject = renderTemplate(template.subject, vars, { keep: [...KEEP_IN_STORAGE, "attachmentUrl", "downloadDeadlineROC"] }).text;
   const body = renderTemplate(template.body, vars, { keep: [...KEEP_IN_STORAGE, "attachmentUrl", "downloadDeadlineROC"] }).text;
   const taskId =
@@ -48,10 +47,10 @@ export async function createDocumentDraft(user: AuthUser, input: { caseId: strin
       taskId,
       templateId: template.id,
       documentType: input.documentType,
-      recipient: schoolCase.agencyName,
+      recipient: "如行文單位",
       primaryRecipients: schoolCase.agencyName,
       ccRecipients: null,
-      attachments: "如說明",
+      attachments: "",
       subject,
       body,
       draftDate: isoToDbDate(taipeiToday()),
@@ -212,13 +211,13 @@ export function renderDocumentContent(doc: {
   attachmentPassword: string | null;
   downloadDeadline: Date | null;
   schoolCase: Parameters<typeof buildDocumentVariables>[0]["schoolCase"];
-}) {
+}, companyName = "") {
   const vars = buildDocumentVariables({
     schoolCase: doc.schoolCase,
     attachmentUrl: doc.attachmentUrl,
     attachmentPassword: doc.attachmentPassword,
     downloadDeadline: dbDateToISOOrNull(doc.downloadDeadline),
-    companyName: companyName(),
+    companyName,
   });
   const subject = renderTemplate(doc.subject, vars);
   const body = renderTemplate(doc.body, vars);

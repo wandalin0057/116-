@@ -60,3 +60,48 @@ export async function updateEmailSettings(user: AuthUser, input: z.input<typeof 
   await prisma.systemSetting.upsert({ where: { key: KEY }, create: { key: KEY, value, updatedById: user.id }, update: { value, updatedById: user.id } });
   await writeAudit({ actorId: user.id, action: "EMAIL_SETTINGS_UPDATE", entityType: "SystemSetting", entityId: KEY, summary: `更新 Email 設定（測試模式：${p.data.testMode ? "開" : "關"}）`, changes: value });
 }
+
+// ───────────────────────── 發文單位資訊（公文抬頭） ─────────────────────────
+
+export interface Organization {
+  companyName: string;
+  address: string;
+  contactName: string;
+  phone: string;
+  fax: string;
+  email: string;
+}
+
+const ORG_KEY = "organization";
+
+const orgSchema = z.object({
+  companyName: z.string().trim().min(1, "請輸入公司名稱").max(100),
+  address: z.string().trim().max(200),
+  contactName: z.string().trim().max(50),
+  phone: z.string().trim().max(50),
+  fax: z.string().trim().max(50),
+  email: z.string().trim().max(200).refine((v) => !v || z.string().email().safeParse(v).success, "電子郵件格式錯誤"),
+});
+
+export async function getOrganization(): Promise<Organization> {
+  const row = await prisma.systemSetting.findUnique({ where: { key: ORG_KEY } });
+  const stored = orgSchema.partial().safeParse(row?.value ?? {});
+  const s = stored.success ? stored.data : {};
+  return {
+    companyName: s.companyName || process.env.COMPANY_NAME || "○○交通工程顧問有限公司",
+    address: s.address ?? "",
+    contactName: s.contactName ?? "",
+    phone: s.phone ?? "",
+    fax: s.fax ?? "",
+    email: s.email ?? "",
+  };
+}
+
+export async function updateOrganization(user: AuthUser, input: z.input<typeof orgSchema>) {
+  assertAdmin(user);
+  const p = orgSchema.safeParse(input);
+  if (!p.success) throw new ValidationError(p.error.issues[0]?.message ?? "資料格式錯誤");
+  const value = p.data satisfies Prisma.InputJsonValue;
+  await prisma.systemSetting.upsert({ where: { key: ORG_KEY }, create: { key: ORG_KEY, value, updatedById: user.id }, update: { value, updatedById: user.id } });
+  await writeAudit({ actorId: user.id, action: "ORGANIZATION_UPDATE", entityType: "SystemSetting", entityId: ORG_KEY, summary: "更新發文單位資訊（公文抬頭）", changes: value });
+}

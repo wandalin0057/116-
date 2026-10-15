@@ -26,11 +26,10 @@ export const DEFAULT_DOCUMENT_TEMPLATES: TemplateDef[] = [
     type: "PRE_REPORT",
     category: "DOCUMENT",
     name: "事前規劃及分析報告書",
-    subject: "檢送「{projectName}」{schoolName}事前－規劃及分析報告書，附件詳如說明三，請查照。",
+    subject: "檢送「{projectName}」{schoolName}事前－規劃及分析報告書，附件詳如說明二，請查照。",
     body: [
-      "一、依據本案徵求服務建議書第肆點規定辦理。",
-      "二、依據貴局{notificationDateROC}電子郵件辦理。",
-      "三、附件網址：{attachmentUrl}，下載密碼：{attachmentPassword}（請於{downloadDeadlineROC}前下載）。",
+      "一、依據本案徵求服務建議書第肆點規定及貴局{notificationDateROC}電子郵件辦理。",
+      "二、附件網址：{attachmentUrl}，下載密碼：{attachmentPassword}(請於{downloadDeadlineROC}前下載)。",
     ].join("\n"),
   },
   {
@@ -62,6 +61,64 @@ export const DEFAULT_EMAIL_TEMPLATES: TemplateDef[] = [
     name: "審查會議前寄送簡報",
     subject: "【{projectName}】{schoolName}審查會議簡報",
     body: [
+      "您好，",
+      "有關「{projectName}」{notificationRoundText}之{schoolName}，審查簡報因檔案較大，煩請至以下連結下載，",
+      "",
+      "{attachmentUrl}",
+      "",
+      "請您查收，謝謝。",
+      "",
+      "{signature}",
+    ].join("\n"),
+  },
+  {
+    type: "REVIEW_MINUTES_EMAIL",
+    category: "EMAIL",
+    name: "審查會議後寄送會議紀錄",
+    subject: "【{projectName}】{schoolName}審查會議紀錄",
+    body: [
+      "您好，",
+      "有關{eventDayWord}{eventMonthDay}辦理之{schoolName}審查會議，會議記錄如附件所示，",
+      "",
+      "請查收，謝謝。",
+      "",
+      "{signature}",
+    ].join("\n"),
+  },
+  {
+    type: "SITE_VISIT_MINUTES_EMAIL",
+    category: "EMAIL",
+    name: "會勘後寄送會勘紀錄",
+    subject: "【{projectName}】{schoolName}現場會勘紀錄",
+    body: [
+      "您好，",
+      "有關{eventDayWord}{eventMonthDay}辦理之{schoolName}現場會勘，會勘紀錄如附件所示，",
+      "",
+      "請查收，謝謝。",
+      "",
+      "{signature}",
+    ].join("\n"),
+  },
+];
+
+/**
+ * 舊版系統預設範本（用於自動升級：資料庫中仍為未修改過之舊預設時，啟動時改用新預設並新增版本）。
+ * 使用者自行修改過的範本不會被覆蓋。
+ */
+export const LEGACY_DEFAULT_TEMPLATES: { type: TemplateType; subject: string; body: string }[] = [
+  {
+    type: "PRE_REPORT",
+    subject: "檢送「{projectName}」{schoolName}事前－規劃及分析報告書，附件詳如說明三，請查照。",
+    body: [
+      "一、依據本案徵求服務建議書第肆點規定辦理。",
+      "二、依據貴局{notificationDateROC}電子郵件辦理。",
+      "三、附件網址：{attachmentUrl}，下載密碼：{attachmentPassword}（請於{downloadDeadlineROC}前下載）。",
+    ].join("\n"),
+  },
+  {
+    type: "REVIEW_SLIDES_EMAIL",
+    subject: "【{projectName}】{schoolName}審查會議簡報",
+    body: [
       "{agencyContact} 您好：",
       "",
       "有關「{projectName}」{schoolName}審查會議訂於{eventDateTime}{eventLocationText}召開，",
@@ -75,8 +132,6 @@ export const DEFAULT_EMAIL_TEMPLATES: TemplateDef[] = [
   },
   {
     type: "REVIEW_MINUTES_EMAIL",
-    category: "EMAIL",
-    name: "審查會議後寄送會議紀錄",
     subject: "【{projectName}】{schoolName}審查會議紀錄",
     body: [
       "{agencyContact} 您好：",
@@ -92,8 +147,6 @@ export const DEFAULT_EMAIL_TEMPLATES: TemplateDef[] = [
   },
   {
     type: "SITE_VISIT_MINUTES_EMAIL",
-    category: "EMAIL",
-    name: "會勘後寄送會勘紀錄",
     subject: "【{projectName}】{schoolName}現場會勘紀錄",
     body: [
       "{agencyContact} 您好：",
@@ -136,6 +189,11 @@ export const TEMPLATE_VARIABLES: Record<TemplateCategory, { key: string; label: 
     { key: "eventLocation", label: "地點" },
     { key: "eventLocationText", label: "「於○○」地點文字" },
     { key: "attachmentNames", label: "附件名稱" },
+    { key: "attachmentUrl", label: "下載連結（草稿頁填寫）" },
+    { key: "notificationRoundText", label: "「第11次通知」" },
+    { key: "eventMonthDay", label: "會議或會勘月/日（10/5）" },
+    { key: "eventDayWord", label: "「昨日」「今日」等相對日期" },
+    { key: "signature", label: "寄件人簽名檔（個人帳號設定）" },
     { key: "companyName", label: "公司名稱" },
     { key: "senderName", label: "寄件人姓名" },
   ],

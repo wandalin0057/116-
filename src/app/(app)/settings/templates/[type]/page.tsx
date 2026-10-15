@@ -12,12 +12,14 @@ import { formatROCDateTime, isoToDbDate, parseTaipeiDateTime } from "@/lib/dates
 import { buildDocumentVariables, buildEmailVariables } from "@/server/documents/document-variables";
 import { ALL_DEFAULT_TEMPLATES, TEMPLATE_TYPE_LABELS, TEMPLATE_VARIABLES } from "@/server/templates/default-templates";
 import { getActiveTemplate, listTemplateVersions } from "@/server/templates/template-service";
+import { getOrganization } from "@/server/settings/settings-service";
 
 export default async function TemplateEditPage({ params }: { params: Promise<{ type: string }> }) {
   await requireAdminPage();
   const { type } = await params;
   const def = ALL_DEFAULT_TEMPLATES.find((t) => t.type === type);
   if (!def) notFound();
+  const org = await getOrganization();
   const [active, versions] = await Promise.all([getActiveTemplate(type as TemplateType), listTemplateVersions(type as TemplateType)]);
   const sampleCase = {
     projectName: "115年度臺北市通學區規劃分析案",
@@ -29,8 +31,8 @@ export default async function TemplateEditPage({ params }: { params: Promise<{ t
   };
   const sampleVars =
     def.category === "DOCUMENT"
-      ? buildDocumentVariables({ schoolCase: sampleCase, attachmentUrl: "https://example.com/files", attachmentPassword: "（密碼）", downloadDeadline: "2026-11-30", companyName: process.env.COMPANY_NAME })
-      : buildEmailVariables({ schoolCase: sampleCase, eventDateTime: sampleCase.reviewMeetingDateTime, eventLocation: "交通局會議室", attachmentNames: "審查簡報.pdf", companyName: process.env.COMPANY_NAME, senderName: "陳工程師" });
+      ? buildDocumentVariables({ schoolCase: sampleCase, attachmentUrl: "https://example.com/files", attachmentPassword: "（密碼）", downloadDeadline: "2026-11-30", companyName: org.companyName })
+      : buildEmailVariables({ schoolCase: sampleCase, eventDateTime: sampleCase.reviewMeetingDateTime, eventLocation: "交通局會議室", attachmentNames: "審查簡報.pdf", companyName: org.companyName, senderName: "陳工程師", signature: "林映辰 規劃師\nexample@company.com", notificationRound: 11, now: new Date("2026-10-23T02:00:00Z") });
 
   return (
     <>

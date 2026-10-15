@@ -14,11 +14,18 @@ function fieldParagraph(label: string, value: string) {
 export async function renderDocx(layout: DocumentLayout): Promise<Buffer> {
   const indent = 640; // twips：主旨／說明 懸掛縮排
   const children: Paragraph[] = [
+    ...layout.fileFields.map(
+      (f) => new Paragraph({ indent: { left: 6200 }, children: [new TextRun({ text: `${f.label}：${f.value}`, font: FONT, size: pt(12) })] }),
+    ),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { after: 240 },
+      spacing: { before: 120, after: 160 },
       children: [new TextRun({ text: layout.title, font: FONT, size: pt(20), bold: true })],
     }),
+    ...layout.orgLines.map(
+      (l) => new Paragraph({ indent: { left: 4800 }, children: [new TextRun({ text: `${l.label}：${l.value}`, font: FONT, size: pt(12) })] }),
+    ),
+    new Paragraph({ spacing: { after: 120 }, children: [] }),
     ...layout.headerFields.map((f) => fieldParagraph(f.label, f.value)),
     new Paragraph({
       spacing: { before: 240, after: 120, line: 400 },

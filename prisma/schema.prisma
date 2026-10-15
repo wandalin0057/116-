@@ -30,6 +30,8 @@ model User {
   lockedUntil       DateTime? @db.Timestamptz
   lastLoginAt       DateTime? @db.Timestamptz
   passwordChangedAt DateTime? @db.Timestamptz
+  // Email 草稿結尾的簽名檔（姓名、職稱、聯絡方式）
+  emailSignature    String?
   createdAt         DateTime  @default(now()) @db.Timestamptz
   updatedAt         DateTime  @updatedAt @db.Timestamptz
 
@@ -90,6 +92,8 @@ model SchoolCase {
   agencyEmail           String?
   responsibleUserId     String
   notificationDate      DateTime?  @db.Date
+  // 機關第幾次通知（Email 內文「第11次通知」）
+  notificationRound     Int?
   reviewMeetingDateTime DateTime?  @db.Timestamptz
   reviewMeetingLocation String?
   siteVisitDateTime     DateTime?  @db.Timestamptz
@@ -392,6 +396,8 @@ model EmailDraft {
   subject         String
   body            String
   attachmentNames String?
+  // 下載連結（例如 Google Drive），內文以 {attachmentUrl} 代入
+  attachmentUrl   String?
   eventDateTime   DateTime?        @db.Timestamptz
   status          EmailDraftStatus @default(DRAFT)
   confirmedSentAt DateTime?        @db.Timestamptz
@@ -460,16 +466,16 @@ model BusinessDayOverride {
 // ───────────────────────── 提醒與通知 ─────────────────────────
 
 model ReminderPreference {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  emailEnabled       Boolean  @default(true)
-  leadBusinessDays   Int      @default(3)
-  overdueEnabled     Boolean  @default(true)
-  dailyDigestEnabled Boolean  @default(true)
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  emailEnabled         Boolean  @default(true)
+  leadBusinessDays     Int      @default(3)
+  overdueEnabled       Boolean  @default(true)
+  dailyDigestEnabled   Boolean  @default(true)
   // 管理員（專案經理）：每日改收全部學校總表（含各負責人），取代個人提醒
-  managerDigestEnabled Boolean @default(false)
-  createdAt          DateTime @default(now()) @db.Timestamptz
-  updatedAt          DateTime @updatedAt @db.Timestamptz
+  managerDigestEnabled Boolean  @default(false)
+  createdAt            DateTime @default(now()) @db.Timestamptz
+  updatedAt            DateTime @updatedAt @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -12,7 +12,7 @@ import { PrismaClient } from "@prisma/client";
 import { isoToDbDate } from "../src/lib/dates";
 import { parseCalendarJson } from "../src/server/business-days/calendar-import";
 import { DEFAULT_DEADLINE_RULES } from "../src/server/schedule/deadline-rules";
-import { ALL_DEFAULT_TEMPLATES } from "../src/server/templates/default-templates";
+import { ALL_DEFAULT_TEMPLATES, LEGACY_DEFAULT_TEMPLATES } from "../src/server/templates/default-templates";
 import { hashPassword, validatePasswordStrength } from "../src/server/auth/password";
 
 const prisma = new PrismaClient();
@@ -31,7 +31,21 @@ async function seedTemplates() {
       await prisma.documentTemplate.create({ data: { ...t, version: 1, isActive: true, changeNote: "系統預設範本" } });
     }
   }
-  console.log(`✓ 預設範本 ${ALL_DEFAULT_TEMPLATES.length} 種`);
+  // 啟用中之範本若仍為「未修改過的舊版預設」，升級為新版預設（新增版本，舊版保留可回復）
+  let upgraded = 0;
+  for (const legacy of LEGACY_DEFAULT_TEMPLATES) {
+    const active = await prisma.documentTemplate.findFirst({ where: { type: legacy.type, isActive: true }, orderBy: { version: "desc" } });
+    const next = ALL_DEFAULT_TEMPLATES.find((t) => t.type === legacy.type);
+    if (!active || !next || active.subject !== legacy.subject || active.body !== legacy.body) continue;
+    await prisma.$transaction([
+      prisma.documentTemplate.update({ where: { id: active.id }, data: { isActive: false } }),
+      prisma.documentTemplate.create({
+        data: { ...next, version: active.version + 1, isActive: true, changeNote: "系統更新預設範本（依使用者提供之格式）" },
+      }),
+    ]);
+    upgraded++;
+  }
+  console.log(`✓ 預設範本 ${ALL_DEFAULT_TEMPLATES.length} 種${upgraded ? `（已升級 ${upgraded} 種為新版格式）` : ""}`);
 }
 
 async function seedCalendars() {

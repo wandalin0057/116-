@@ -20,13 +20,19 @@ interface Draft {
   subject: string;
   body: string;
   attachmentNames: string;
+  attachmentUrl: string;
   eventDateTime: string;
   agencyContact: string;
 }
 
+/** 將內文中的 {attachmentUrl} 代入下載連結 */
+function renderBody(d: Draft) {
+  return d.attachmentUrl ? d.body.split("{attachmentUrl}").join(d.attachmentUrl) : d.body;
+}
+
 function mailto(d: Draft) {
   const split = (s: string) => s.split(/[,;，；\s]+/).filter(Boolean).join(",");
-  const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(d.body)}`];
+  const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(renderBody(d))}`];
   if (d.ccRecipients) q.unshift(`cc=${encodeURIComponent(split(d.ccRecipients))}`);
   return `mailto:${split(d.toRecipients)}?${q.join("&")}`;
 }
@@ -48,6 +54,7 @@ export function EmailEditor({
   const [checked, setChecked] = useState(false);
   const { run, pending } = useAction();
   const locked = !canEdit || d.status !== "DRAFT";
+  const needsUrl = d.body.includes("{attachmentUrl}");
   const dirty = JSON.stringify(d) !== JSON.stringify(saved);
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setD((s) => ({ ...s, [k]: e.target.value }));
 
@@ -60,6 +67,7 @@ export function EmailEditor({
           subject: d.subject,
           body: d.body,
           attachmentNames: d.attachmentNames,
+          attachmentUrl: d.attachmentUrl,
           eventDateTime: d.eventDateTime || undefined,
         }),
       { onSuccess: () => setSaved(d) },
@@ -93,6 +101,14 @@ export function EmailEditor({
               <Input id="att" value={d.attachmentNames} onChange={set("attachmentNames")} disabled={locked} />
             </div>
           </div>
+          {(needsUrl || d.attachmentUrl) && (
+            <div className="space-y-1.5">
+              <Label htmlFor="url">下載連結（例如 Google Drive 分享連結）</Label>
+              <Input id="url" type="url" placeholder="https://drive.google.com/…" value={d.attachmentUrl} onChange={set("attachmentUrl")} disabled={locked} />
+              <p className="text-xs text-muted-foreground">內文中的 {"{attachmentUrl}"} 會自動換成這個連結。</p>
+            </div>
+          )}
+          {needsUrl && !d.attachmentUrl && <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">請填寫下載連結，內文才會出現連結。</p>}
           <div className="space-y-1.5">
             <Label htmlFor="subject">主旨</Label>
             <Input id="subject" value={d.subject} onChange={set("subject")} disabled={locked} />
@@ -110,7 +126,7 @@ export function EmailEditor({
             )}
             <CopyButton text={d.toRecipients} label="複製收件人" />
             <CopyButton text={d.subject} label="複製主旨" />
-            <CopyButton text={d.body} label="複製內文" />
+            <CopyButton text={() => renderBody(d)} label="複製內文" />
             <Button asChild variant="outline" size="sm">
               <a href={mailto(d)}>
                 <MailOpen />
@@ -148,7 +164,7 @@ export function EmailEditor({
               <span className="text-muted-foreground">附件：</span>
               {d.attachmentNames || "—"}
             </p>
-            <div className="mt-2 whitespace-pre-wrap rounded-md border bg-white p-4 leading-relaxed">{d.body}</div>
+            <div className="mt-2 whitespace-pre-wrap break-all rounded-md border bg-white p-4 leading-relaxed">{renderBody(d)}</div>
           </CardContent>
         </Card>
         {canEdit && d.status === "DRAFT" && (

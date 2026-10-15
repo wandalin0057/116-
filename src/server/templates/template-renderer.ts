@@ -6,6 +6,9 @@ export type TemplateVars = Record<string, string | null | undefined>;
 
 const PLACEHOLDER = /\{([A-Za-z][A-Za-z0-9_]*)\}/g;
 
+/** 可為空白的選用變數：沒有值時直接省略，不視為缺漏 */
+const OPTIONAL_VARS = new Set(["eventDayWord", "notificationRoundText", "eventLocationText"]);
+
 export function renderTemplate(text: string, vars: TemplateVars, options: { keep?: string[] } = {}) {
   const missing = new Set<string>();
   const keep = new Set(options.keep ?? []);
@@ -13,6 +16,7 @@ export function renderTemplate(text: string, vars: TemplateVars, options: { keep
     if (keep.has(key)) return match;
     const v = vars[key];
     if (v === undefined || v === null || v === "") {
+      if (OPTIONAL_VARS.has(key)) return "";
       missing.add(key);
       return match;
     }

@@ -10,6 +10,7 @@ import { getDocumentForEdit } from "@/server/documents/document-service";
 import { buildDocumentVariables, DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS } from "@/server/documents/document-variables";
 import { AppError } from "@/server/errors";
 import { getActiveTemplate } from "@/server/templates/template-service";
+import { getOrganization } from "@/server/settings/settings-service";
 
 export const metadata = { title: "公文草稿" };
 
@@ -21,7 +22,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
     throw e;
   });
   const [canEdit, template] = await Promise.all([canAccessCase(user, doc.caseId, "edit"), getActiveTemplate(doc.documentType)]);
-  const baseVars = buildDocumentVariables({ schoolCase: doc.schoolCase, companyName: process.env.COMPANY_NAME ?? "○○交通工程顧問有限公司" });
+  const org = await getOrganization();
+  const baseVars = buildDocumentVariables({ schoolCase: doc.schoolCase, companyName: org.companyName });
   return (
     <>
       <PageHeader
@@ -40,7 +42,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       />
       <DocumentEditor
         canEdit={canEdit}
-        companyName={process.env.COMPANY_NAME ?? "○○交通工程顧問有限公司"}
+        companyName={org.companyName}
+        organization={{ address: org.address, contactName: org.contactName, phone: org.phone, fax: org.fax, email: org.email }}
         schoolName={doc.schoolCase.schoolName}
         isAdmin={user.role === "ADMIN"}
         template={{ subject: template.subject, body: template.body }}
