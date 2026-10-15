@@ -100,6 +100,7 @@ const prefSchema = z.object({
   leadBusinessDays: z.coerce.number().int().min(0, "不可小於 0").max(20, "最多 20 個工作天"),
   overdueEnabled: z.boolean(),
   dailyDigestEnabled: z.boolean(),
+  managerDigestEnabled: z.boolean().optional(),
 });
 
 export async function getReminderPreference(userId: string) {
@@ -109,6 +110,7 @@ export async function getReminderPreference(userId: string) {
       leadBusinessDays: 3,
       overdueEnabled: true,
       dailyDigestEnabled: true,
+      managerDigestEnabled: false,
     }
   );
 }
@@ -116,6 +118,8 @@ export async function getReminderPreference(userId: string) {
 export async function updateReminderPreference(user: AuthUser, input: z.input<typeof prefSchema>) {
   const p = prefSchema.safeParse(input);
   if (!p.success) throw new ValidationError(p.error.issues[0]?.message ?? "資料格式錯誤");
-  await prisma.reminderPreference.upsert({ where: { userId: user.id }, create: { userId: user.id, ...p.data }, update: p.data });
+  // 全部學校總表僅限管理員
+  const data = { ...p.data, managerDigestEnabled: user.role === "ADMIN" ? p.data.managerDigestEnabled ?? false : false };
+  await prisma.reminderPreference.upsert({ where: { userId: user.id }, create: { userId: user.id, ...data }, update: data });
   await writeAudit({ actorId: user.id, action: "REMINDER_PREF_UPDATE", entityType: "ReminderPreference", entityId: user.id, summary: "更新個人通知設定", changes: p.data });
 }

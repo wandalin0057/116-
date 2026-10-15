@@ -33,30 +33,55 @@ export interface RunSummary {
   message: string;
 }
 
-export const dedupeKeyFor = (userId: string, date: ISODate) => `DAILY_DIGEST:${userId}:${date}`;
+export const dedupeKeyFor = (userId: string, date: ISODate, type: NotificationType = "DAILY_DIGEST") => `${type}:${userId}:${date}`;
+
+type NotificationType = "DAILY_DIGEST" | "MANAGER_DIGEST";
+
+const OPEN_TASK_WHERE = {
+  reminderEnabled: true,
+  status: { in: OPEN_TASK_STATUSES },
+  schoolCase: { status: { in: ["ACTIVE", "ON_HOLD"] as ("ACTIVE" | "ON_HOLD")[] } },
+};
+
+function toReminderTask(t: {
+  id: string;
+  caseId: string;
+  title: string;
+  taskType: ReminderTask["taskType"];
+  overrideDueDate: Date | null;
+  calculatedDueDate: Date | null;
+  dueDateEstimated: boolean;
+  schoolCase: { schoolName: string; responsibleUser?: { name: string } };
+  assignedUser?: { name: string } | null;
+}): ReminderTask {
+  return {
+    id: t.id,
+    caseId: t.caseId,
+    schoolName: t.schoolCase.schoolName,
+    title: t.title,
+    taskType: t.taskType,
+    dueDate: dbDateToISO((t.overrideDueDate ?? t.calculatedDueDate)!),
+    estimated: !t.overrideDueDate && t.dueDateEstimated,
+    assigneeName: t.assignedUser?.name ?? t.schoolCase.responsibleUser?.name ?? null,
+  };
+}
+
+/** 全部學校總表：所有執行中案件之未完成工作（專案經理使用） */
+async function loadAllTasks(): Promise<ReminderTask[]> {
+  const tasks = await prisma.task.findMany({
+    where: OPEN_TASK_WHERE,
+    include: { schoolCase: { select: { schoolName: true, responsibleUser: { select: { name: true } } } }, assignedUser: { select: { name: true } } },
+  });
+  return tasks.filter((t) => t.overrideDueDate || t.calculatedDueDate).map(toReminderTask);
+}
 
 /** 取得使用者的提醒工作：指派給本人，或未指派且本人為案件負責人 */
 async function loadUserTasks(userId: string): Promise<ReminderTask[]> {
   const tasks = await prisma.task.findMany({
-    where: {
-      reminderEnabled: true,
-      status: { in: OPEN_TASK_STATUSES },
-      schoolCase: { status: { in: ["ACTIVE", "ON_HOLD"] } },
-      OR: [{ assignedUserId: userId }, { assignedUserId: null, schoolCase: { responsibleUserId: userId } }],
-    },
+    where: { ...OPEN_TASK_WHERE, OR: [{ assignedUserId: userId }, { assignedUserId: null, schoolCase: { responsibleUserId: userId } }] },
     include: { schoolCase: { select: { schoolName: true } } },
   });
-  return tasks
-    .filter((t) => t.overrideDueDate || t.calculatedDueDate)
-    .map((t) => ({
-      id: t.id,
-      caseId: t.caseId,
-      schoolName: t.schoolCase.schoolName,
-      title: t.title,
-      taskType: t.taskType,
-      dueDate: dbDateToISO((t.overrideDueDate ?? t.calculatedDueDate)!),
-      estimated: !t.overrideDueDate && t.dueDateEstimated,
-    }));
+  return tasks.filter((t) => t.overrideDueDate || t.calculatedDueDate).map(toReminderTask);
 }
 
 /**
@@ -65,6 +90,7 @@ async function loadUserTasks(userId: string): Promise<ReminderTask[]> {
  */
 async function claimNotification(args: {
   userId: string;
+  type: NotificationType;
   dedupeKey: string;
   digestDate: ISODate;
   recipient: string;
@@ -77,7 +103,7 @@ async function claimNotification(args: {
     const created = await prisma.notificationLog.create({
       data: {
         userId: args.userId,
-        type: "DAILY_DIGEST",
+        type: args.type,
         dedupeKey: args.dedupeKey,
         digestDate: isoToDbDate(args.digestDate),
         recipient: args.recipient,
@@ -159,12 +185,15 @@ export async function runDailyReminders(options: RunOptions = {}): Promise<RunSu
     let skipped = 0;
 
     for (const user of users) {
-      const pref = user.reminderPreference ?? { emailEnabled: true, dailyDigestEnabled: true, leadBusinessDays: 3, overdueEnabled: true };
-      if (!pref.emailEnabled || !pref.dailyDigestEnabled) {
+      const pref = user.reminderPreference ?? { emailEnabled: true, dailyDigestEnabled: true, leadBusinessDays: 3, overdueEnabled: true, managerDigestEnabled: false };
+      // 管理員選擇「全部學校總表」時，改寄總表（已涵蓋自己負責的學校）
+      const overview = user.role === "ADMIN" && pref.managerDigestEnabled;
+      if (!pref.emailEnabled || (!pref.dailyDigestEnabled && !overview)) {
         skipped++;
         continue;
       }
-      const tasks = await loadUserTasks(user.id);
+      const type: NotificationType = overview ? "MANAGER_DIGEST" : "DAILY_DIGEST";
+      const tasks = overview ? await loadAllTasks() : await loadUserTasks(user.id);
       const digest = buildDigest(tasks, pref, runDate, bds);
       const count = digestCount(digest);
       if (!count) {
@@ -180,10 +209,12 @@ export async function runDailyReminders(options: RunOptions = {}): Promise<RunSu
         appUrl,
         testMode: settings.testMode,
         originalRecipient: user.email,
+        overview,
       });
-      const dedupeKey = dedupeKeyFor(user.id, runDate);
+      const dedupeKey = dedupeKeyFor(user.id, runDate, type);
       const logId = await claimNotification({
         userId: user.id,
+        type,
         dedupeKey,
         digestDate: runDate,
         recipient,

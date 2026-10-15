@@ -49,10 +49,16 @@ export function ChangePasswordForm() {
   );
 }
 
-export function ReminderPreferenceForm({ initial }: { initial: { emailEnabled: boolean; leadBusinessDays: number; overdueEnabled: boolean; dailyDigestEnabled: boolean } }) {
+export function ReminderPreferenceForm({
+  initial,
+  isAdmin = false,
+}: {
+  initial: { emailEnabled: boolean; leadBusinessDays: number; overdueEnabled: boolean; dailyDigestEnabled: boolean; managerDigestEnabled: boolean };
+  isAdmin?: boolean;
+}) {
   const [v, setV] = useState(initial);
   const { run, pending } = useAction();
-  const toggle = (k: "emailEnabled" | "overdueEnabled" | "dailyDigestEnabled", label: string, desc: string) => (
+  const toggle = (k: "emailEnabled" | "overdueEnabled" | "dailyDigestEnabled" | "managerDigestEnabled", label: string, desc: string) => (
     <label className="flex items-start gap-3 rounded-md border p-3">
       <input type="checkbox" className="mt-0.5 h-4 w-4" checked={v[k]} onChange={(e) => setV((s) => ({ ...s, [k]: e.target.checked }))} />
       <span>
@@ -71,6 +77,12 @@ export function ReminderPreferenceForm({ initial }: { initial: { emailEnabled: b
     >
       {toggle("emailEnabled", "接收 Email 通知", "關閉後不會收到任何系統提醒信")}
       {toggle("dailyDigestEnabled", "接收每日摘要", "每個工作天上午 8:00 寄送今日到期、即將到期與逾期工作")}
+      {isAdmin &&
+        toggle(
+          "managerDigestEnabled",
+          "改收「全部學校總表」（專案經理）",
+          "每天收到一封整理所有學校、標示各負責人的總表，取代上面只含自己負責學校的摘要。各負責人仍會收到自己的提醒信。",
+        )}
       {toggle("overdueEnabled", "接收逾期通知", "於每日摘要中列出已逾期且未完成之工作")}
       <div className="space-y-1.5">
         <Label htmlFor="lead">提前提醒工作天數</Label>

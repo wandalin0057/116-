@@ -466,6 +466,8 @@ model ReminderPreference {
   leadBusinessDays   Int      @default(3)
   overdueEnabled     Boolean  @default(true)
   dailyDigestEnabled Boolean  @default(true)
+  // 管理員（專案經理）：每日改收全部學校總表（含各負責人），取代個人提醒
+  managerDigestEnabled Boolean @default(false)
   createdAt          DateTime @default(now()) @db.Timestamptz
   updatedAt          DateTime @updatedAt @db.Timestamptz
 

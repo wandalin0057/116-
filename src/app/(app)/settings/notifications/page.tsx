@@ -22,7 +22,14 @@ export default async function NotificationSettingsPage() {
           </CardHeader>
           <CardContent>
             <ReminderPreferenceForm
-              initial={{ emailEnabled: pref.emailEnabled, leadBusinessDays: pref.leadBusinessDays, overdueEnabled: pref.overdueEnabled, dailyDigestEnabled: pref.dailyDigestEnabled }}
+              isAdmin={isAdmin(user)}
+              initial={{
+                emailEnabled: pref.emailEnabled,
+                leadBusinessDays: pref.leadBusinessDays,
+                overdueEnabled: pref.overdueEnabled,
+                dailyDigestEnabled: pref.dailyDigestEnabled,
+                managerDigestEnabled: pref.managerDigestEnabled,
+              }}
             />
           </CardContent>
         </Card>

@@ -43,7 +43,7 @@ export async function changeOwnPasswordAction(current: string, next: string) {
 }
 
 // ── 通知 ──
-export async function updateReminderPreferenceAction(input: { emailEnabled: boolean; leadBusinessDays: number; overdueEnabled: boolean; dailyDigestEnabled: boolean }) {
+export async function updateReminderPreferenceAction(input: { emailEnabled: boolean; leadBusinessDays: number; overdueEnabled: boolean; dailyDigestEnabled: boolean; managerDigestEnabled?: boolean }) {
   return runAction(async () => updateReminderPreference(await requireUserForAction(), input), "通知設定已儲存");
 }
 export async function updateEmailSettingsAction(input: { testMode: boolean; testRecipient?: string; skipNonBusinessDays: boolean }) {

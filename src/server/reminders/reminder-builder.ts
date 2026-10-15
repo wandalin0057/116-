@@ -12,6 +12,8 @@ export interface ReminderTask {
   taskType: TaskType;
   dueDate: ISODate;
   estimated: boolean;
+  /** 負責人姓名（全部學校總表使用） */
+  assigneeName?: string | null;
 }
 
 export interface ReminderPrefs {
@@ -50,10 +52,21 @@ export const digestCount = (d: Digest) => d.dueToday.length + d.upcoming.length 
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-export function renderDigestEmail(args: { recipientName: string; recipientEmail: string; date: ISODate; digest: Digest; appUrl: string; testMode: boolean; originalRecipient?: string }) {
+export function renderDigestEmail(args: {
+  recipientName: string;
+  recipientEmail: string;
+  date: ISODate;
+  digest: Digest;
+  appUrl: string;
+  testMode: boolean;
+  originalRecipient?: string;
+  /** 全部學校總表：顯示負責人欄位，主旨與標題不同 */
+  overview?: boolean;
+}) {
+  const ov = args.overview === true;
   const { digest, appUrl } = args;
   const base = appUrl.replace(/\/$/, "");
-  const subject = `${args.testMode ? "［測試］" : ""}【通學區案件】${formatROC(args.date)} 每日工作提醒（今日 ${digest.dueToday.length}、即將到期 ${digest.upcoming.length}、逾期 ${digest.overdue.length}）`;
+  const subject = `${args.testMode ? "［測試］" : ""}【通學區案件】${formatROC(args.date)} ${ov ? "全部學校總表" : "每日工作提醒"}（今日 ${digest.dueToday.length}、即將到期 ${digest.upcoming.length}、逾期 ${digest.overdue.length}）`;
 
   const section = (title: string, color: string, items: DigestItem[], remainLabel: (i: DigestItem) => string) => {
     if (!items.length) return `<h3 style="color:${color};margin:20px 0 6px">${title}（0）</h3><p style="color:#64748b;margin:0">無</p>`;
@@ -61,6 +74,7 @@ export function renderDigestEmail(args: { recipientName: string; recipientEmail:
       .map(
         (i) => `<tr>
 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${esc(i.schoolName)}</td>
+${ov ? `<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap">${esc(i.assigneeName ?? "未指派")}</td>` : ""}
 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0">${esc(TASK_TYPE_LABELS[i.taskType])}<br><span style="color:#64748b;font-size:12px">${esc(i.title)}</span></td>
 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap">${formatROCShort(i.dueDate)}${i.estimated ? "（暫估）" : ""}</td>
 <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap">${remainLabel(i)}</td>
@@ -70,7 +84,7 @@ export function renderDigestEmail(args: { recipientName: string; recipientEmail:
       .join("");
     return `<h3 style="color:${color};margin:20px 0 6px">${title}（${items.length}）</h3>
 <table style="border-collapse:collapse;width:100%;font-size:14px"><thead><tr style="background:#f1f5f9;text-align:left">
-<th style="padding:6px 8px">學校</th><th style="padding:6px 8px">工作</th><th style="padding:6px 8px">期限</th><th style="padding:6px 8px">剩餘工作天</th><th style="padding:6px 8px">連結</th>
+<th style="padding:6px 8px">學校</th>${ov ? '<th style="padding:6px 8px">負責人</th>' : ""}<th style="padding:6px 8px">工作</th><th style="padding:6px 8px">期限</th><th style="padding:6px 8px">剩餘工作天</th><th style="padding:6px 8px">連結</th>
 </tr></thead><tbody>${rows}</tbody></table>`;
   };
 
@@ -80,7 +94,8 @@ export function renderDigestEmail(args: { recipientName: string; recipientEmail:
 
   const html = `<div style="font-family:'Noto Sans TC','Microsoft JhengHei',sans-serif;color:#0f172a;max-width:760px">
 ${testBanner}
-<h2 style="color:#1e3a8a;margin:0 0 4px">每日工作提醒</h2>
+<h2 style="color:#1e3a8a;margin:0 0 4px">${ov ? "全部學校總表" : "每日工作提醒"}</h2>
+${ov ? '<p style="margin:0 0 4px;color:#475569">所有執行中學校之今日到期、即將到期與逾期工作；各負責人另會收到自己的提醒信。</p>' : ""}
 <p style="margin:0 0 4px">收件人：${esc(args.recipientName)}（${esc(args.recipientEmail)}）</p>
 <p style="margin:0 0 12px">日期：${formatROC(args.date)}</p>
 ${section("今日到期", "#b45309", digest.dueToday, () => "今日")}
@@ -90,7 +105,7 @@ ${section("已逾期", "#b91c1c", digest.overdue, (i) => `逾期 ${Math.abs(i.re
 <p style="color:#94a3b8;font-size:12px;margin-top:16px">此信由通學區案件期程暨發文管理系統自動寄送；可於系統「通知設定」調整提醒方式。</p>
 </div>`;
 
-  const line = (i: DigestItem, extra: string) => `- ${i.schoolName}｜${TASK_TYPE_LABELS[i.taskType]}｜${formatROCShort(i.dueDate)}${i.estimated ? "（暫估）" : ""}｜${extra}｜${base}/cases/${i.caseId}`;
+  const line = (i: DigestItem, extra: string) => `- ${i.schoolName}${ov ? `｜${i.assigneeName ?? "未指派"}` : ""}｜${TASK_TYPE_LABELS[i.taskType]}｜${formatROCShort(i.dueDate)}${i.estimated ? "（暫估）" : ""}｜${extra}｜${base}/cases/${i.caseId}`;
   const text = [
     args.testMode ? `［測試模式］原收件人：${args.originalRecipient ?? ""}` : "",
     `收件人：${args.recipientName}（${args.recipientEmail}）`,

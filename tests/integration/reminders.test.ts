@@ -83,4 +83,34 @@ describe.skipIf(!hasTestDb)("12. 每日提醒排程", () => {
     expect(r.runDate).toBe("2026-10-26");
     expect(mailer.send).not.toHaveBeenCalled();
   });
+
+  it("專案經理改收全部學校總表；各負責人仍收自己的提醒，且不重複寄送", async () => {
+    const pm = await makeUser("pm-boss@example.com", "ADMIN", "林經理");
+    const chen = await makeUser("chen@example.com", "USER", "陳工程師");
+    const wang = await makeUser("wang@example.com", "USER", "王工程師");
+    await prisma.reminderPreference.update({ where: { userId: pm.id }, data: { managerDigestEnabled: true } });
+    await createCase(chen, caseInput({ responsibleUserId: chen.id, projectCode: "TP-A", schoolName: "仁愛國小" }));
+    await createCase(wang, caseInput({ responsibleUserId: wang.id, projectCode: "TP-B", schoolName: "永吉國小" }));
+    const mailer = fakeMailer();
+    const r = await runDailyReminders({ now: NOW, mailer });
+    expect(r.sent).toBe(3);
+    const byTo = Object.fromEntries(mailer.send.mock.calls.map((c) => [c[0].to, c[0]]));
+    expect(byTo["chen@example.com"].text).toContain("仁愛國小");
+    expect(byTo["chen@example.com"].text).not.toContain("永吉國小");
+    const overview = byTo["pm-boss@example.com"];
+    expect(overview.subject).toContain("全部學校總表");
+    expect(overview.text).toContain("仁愛國小｜陳工程師");
+    expect(overview.text).toContain("永吉國小｜王工程師");
+    expect(overview.html).toContain("負責人");
+    expect(await prisma.notificationLog.count({ where: { type: "MANAGER_DIGEST" } })).toBe(1);
+    await runDailyReminders({ now: NOW, mailer });
+    expect(mailer.send).toHaveBeenCalledTimes(3);
+  });
+
+  it("一般使用者無法開啟全部學校總表", async () => {
+    const { updateReminderPreference } = await import("@/server/users/user-service");
+    const u = await makeUser("user@example.com");
+    await updateReminderPreference(u, { emailEnabled: true, leadBusinessDays: 3, overdueEnabled: true, dailyDigestEnabled: true, managerDigestEnabled: true });
+    expect((await prisma.reminderPreference.findUniqueOrThrow({ where: { userId: u.id } })).managerDigestEnabled).toBe(false);
+  });
 });
