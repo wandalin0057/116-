@@ -1,5 +1,5 @@
 "use client";
-import { Ban, Check, CheckCircle2, Download, ImageIcon, Loader2, MailOpen, Save } from "lucide-react";
+import { Ban, Check, CheckCircle2, ImageIcon, Loader2, MailOpen, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { cancelEmailDraftAction, confirmEmailSentAction, updateEmailDraftAction } from "@/app/actions/emails";
@@ -70,14 +70,16 @@ function RichCopyButton({ html, text, hasImage }: { html: string; text: string; 
   );
 }
 
-/** 下載 Outlook 郵件檔：雙擊開啟即為含完整格式與簽名圖片的新郵件 */
+/**
+ * 以郵件程式開啟（含簽名檔）：產生 Outlook 郵件檔（.eml）。
+ * mailto: 連結只能帶純文字，因此改用郵件檔；開啟後即為含完整格式與簽名圖片的新郵件。
+ */
 function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSignature | null }) {
   const [busy, setBusy] = useState(false);
   return (
     <Button
       type="button"
       size="sm"
-      variant="outline"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -92,7 +94,7 @@ function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSig
           a.click();
           a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 10_000);
-          toast.success("已下載郵件檔，請點兩下用 Outlook 開啟，附加檔案後即可傳送");
+          toast.success("郵件已產生，請點瀏覽器下載區的檔案，Outlook 會開啟新郵件（含簽名檔）", { duration: 8000 });
         } catch {
           toast.error("無法產生郵件檔，請改用「複製內文」");
         } finally {
@@ -100,8 +102,8 @@ function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSig
         }
       }}
     >
-      {busy ? <Loader2 className="animate-spin" /> : <Download />}
-      下載 Outlook 郵件檔
+      {busy ? <Loader2 className="animate-spin" /> : <MailOpen />}
+      以郵件程式開啟（含簽名檔）
     </Button>
   );
 }
@@ -212,11 +214,8 @@ export function EmailEditor({
             <OutlookFileButton d={d} signature={signature} />
             <RichCopyButton html={buildEmailHtml(withUrl(d), signature)} text={renderBody(d, signature)} hasImage={!!signature?.html.includes("<img")} />
             <CopyButton text={() => renderBody(d, signature)} label="複製純文字" />
-            <Button asChild variant="outline" size="sm">
-              <a href={mailto(d, signature)}>
-                <MailOpen />
-                以郵件程式開啟
-              </a>
+            <Button asChild variant="ghost" size="sm">
+              <a href={mailto(d, signature)}>以郵件程式開啟（純文字）</a>
             </Button>
             {canEdit && (d.status !== "CONFIRMED_SENT" || isAdmin) && (
               <DeleteEmailDraftButton id={d.id} schoolName={schoolName} sent={d.status === "CONFIRMED_SENT"} redirectTo="/emails" size="sm" />
@@ -255,7 +254,7 @@ export function EmailEditor({
               dangerouslySetInnerHTML={{ __html: buildEmailHtml(withUrl(d), signature) }}
             />
             <p className="text-xs text-muted-foreground">
-              建議用「下載 Outlook 郵件檔」：點兩下檔案即開啟新郵件，字型、顏色與簽名圖片完整保留。「以郵件程式開啟」只能帶入純文字。
+              按「以郵件程式開啟（含簽名檔）」後，點瀏覽器下載區的檔案，Outlook 即開啟新郵件，字型、顏色與簽名圖片與設定相同。想每次自動開啟：在下載區該檔案旁按「⋯」選「一律開啟這類檔案」。
             </p>
           </CardContent>
         </Card>
