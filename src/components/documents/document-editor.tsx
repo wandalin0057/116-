@@ -1,4 +1,5 @@
 "use client";
+import { useCanComplete } from "@/components/layout/viewer-context";
 import { Ban, CheckCircle2, Eye, EyeOff, FileDown, FileText, Loader2, Printer, RotateCcw, Save, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -62,6 +63,7 @@ export function DocumentEditor({
   isAdmin?: boolean;
 }) {
   const [d, setD] = useState(initial);
+  const canComplete = useCanComplete();
   const [saved, setSaved] = useState(initial);
   const [showPw, setShowPw] = useState(false);
   const [dispatchOpen, setDispatchOpen] = useState(false);
@@ -239,30 +241,30 @@ export function DocumentEditor({
                 列印
               </a>
             </Button>
-            {canEdit && d.status === "DRAFT" && (
+            {canEdit && canComplete && d.status === "DRAFT" && (
               <ActionButton
                 variant="secondary"
                 size="sm"
                 disabled={dirty}
                 action={() => markDocumentDraftedAction(d.id)}
                 onDone={() => setD((s) => ({ ...s, status: "DRAFTED" }))}
-                confirm={{ title: "標記已創稿？", description: "將完成對應之「創稿」工作；正式發文需另行標記。", confirmLabel: "標記已創稿" }}
+                confirm={{ title: "標記已創稿？", description: "將完成對應之「創稿」工作；提供圖說需另行標記。", confirmLabel: "標記已創稿" }}
               >
                 <CheckCircle2 />
                 標記已創稿
               </ActionButton>
             )}
-            {canEdit && (d.status === "DRAFT" || d.status === "DRAFTED") && (
+            {canEdit && canComplete && (d.status === "DRAFT" || d.status === "DRAFTED") && (
               <Dialog open={dispatchOpen} onOpenChange={setDispatchOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="success" disabled={dirty}>
                     <Send />
-                    標記已發文
+                    標記已提供圖說
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>記錄正式發文</DialogTitle>
+                    <DialogTitle>記錄提供圖說（正式發文）</DialogTitle>
                     <DialogDescription>請先於機關電子公文系統完成正式發文，再填入系統核發之正式發文字號。本系統不會自行產生發文字號。</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3">

@@ -1,4 +1,5 @@
 "use client";
+import { useCanComplete } from "@/components/layout/viewer-context";
 import type { TaskStatus } from "@prisma/client";
 import { Loader2, Settings2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -30,6 +31,7 @@ export function TaskEditDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<TaskStatus>(task.status);
+  const canComplete = useCanComplete();
   const [override, setOverride] = useState(task.overrideDueDate ?? "");
   const [reason, setReason] = useState(task.overrideReason ?? "");
   const [assignee, setAssignee] = useState(task.assignedUserId ?? "");
@@ -70,13 +72,14 @@ export function TaskEditDialog({
         <div className="grid gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="t-status">狀態</Label>
-            <Select id="t-status" value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
+            <Select id="t-status" value={status} disabled={!canComplete} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
               {Object.entries(TASK_STATUS_LABELS).map(([k, label]) => (
                 <option key={k} value={k}>
                   {label}
                 </option>
               ))}
             </Select>
+            {!canComplete && <p className="text-xs text-muted-foreground">工作狀態僅管理員可以變更。</p>}
             {task.status === "COMPLETED" && status !== "COMPLETED" && <p className="text-xs text-amber-700">重新開啟後，期限將依最新規則重新計算。</p>}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

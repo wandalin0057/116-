@@ -2,7 +2,7 @@ import type { CaseStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { isoToDbDate, parseTaipeiDateTime, taipeiDateOf, type ISODate } from "@/lib/dates";
 import { diffFields, writeAudit } from "@/server/audit/audit";
-import { assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
+import { assertCanComplete, assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
 import { isAdmin, type AuthUser } from "@/server/auth/types";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/server/errors";
 import { orderBy } from "@/server/query-utils";
@@ -368,6 +368,7 @@ export async function setCaseMember(user: AuthUser, caseId: string, memberUserId
 
 /** 標記會議或會勘已辦理，同步完成對應工作 */
 export async function markEventHeld(user: AuthUser, caseId: string, kind: "REVIEW_MEETING" | "SITE_VISIT", info: { attendees?: string | null; notes?: string | null }) {
+  assertCanComplete(user);
   await assertCaseAccess(user, caseId, "edit");
   const now = new Date();
   await prisma.$transaction(async (tx) => {

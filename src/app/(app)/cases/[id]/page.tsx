@@ -129,7 +129,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
         <Card className="xl:col-span-3">
           <CardHeader>
             <CardTitle>期程工作</CardTitle>
-            <p className="text-sm text-muted-foreground">每項工作可單獨完成；完成創稿不代表完成正式發文。</p>
+            <p className="text-sm text-muted-foreground">每項工作可單獨完成；完成創稿不代表已提供圖說。</p>
           </CardHeader>
           <CardContent className="p-0">
             {tasks.length ? (

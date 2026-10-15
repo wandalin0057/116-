@@ -21,7 +21,7 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
 
   it("15. Email 草稿不會在未確認時自動寄出", async () => {
     const spy = vi.spyOn(mailerModule, "createMailer");
-    const u = await makeUser("pm@example.com");
+    const u = await makeUser("pm@example.com", "ADMIN");
     const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
     const draft = await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_SLIDES_EMAIL" });
     expect(draft.status).toBe("DRAFT");
@@ -43,7 +43,7 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
   });
 
   it("公文：密碼加密儲存、創稿與發文分別完成、發文字號由使用者輸入", async () => {
-    const u = await makeUser("pm@example.com");
+    const u = await makeUser("pm@example.com", "ADMIN");
     const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
     const doc = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "PRE_REPORT" });
     expect(doc.documentNumber).toBeNull();
@@ -98,7 +98,7 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     expect(await prisma.officialDocument.count({ where: { id: draft.id } })).toBe(0);
 
     const sent = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "REVIEW_DRAWING" });
-    await markDocumentDispatched(u, sent.id, { documentNumber: "交顧字第1150002號", dispatchDate: "2026-11-02" });
+    await markDocumentDispatched(admin, sent.id, { documentNumber: "交顧字第1150002號", dispatchDate: "2026-11-02" });
     await expect(deleteDocument(u, sent.id)).rejects.toThrow(/僅管理員/);
     await deleteDocument(admin, sent.id);
     expect(await prisma.officialDocument.count({ where: { id: sent.id } })).toBe(0);
@@ -120,7 +120,7 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     expect(await prisma.emailDraft.count({ where: { id: d1.id } })).toBe(0);
 
     const d2 = await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_MINUTES_EMAIL" });
-    await confirmEmailSent(u, d2.id, { confirmed: true });
+    await confirmEmailSent(admin, d2.id, { confirmed: true });
     await expect(deleteEmailDraft(u, d2.id)).rejects.toThrow(/僅管理員/);
     await deleteEmailDraft(admin, d2.id);
     expect(await prisma.emailDraft.count({ where: { id: d2.id } })).toBe(0);
@@ -134,7 +134,7 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     const u = await makeUser("pm@example.com");
     const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
     const doc = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "PRE_REPORT" });
-    await markDocumentDispatched(u, doc.id, { documentNumber: "交顧字第1150009號", dispatchDate: "2026-11-02" });
+    await markDocumentDispatched(admin, doc.id, { documentNumber: "交顧字第1150009號", dispatchDate: "2026-11-02" });
     await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_SLIDES_EMAIL" });
 
     await expect(deleteCase(u, schoolCase.id, { confirmCode: "TP-001" })).rejects.toThrow(/僅管理員/);

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { dbDateToISOOrNull, isISODate, isoToDbDate, taipeiToday } from "@/lib/dates";
 import { writeAudit } from "@/server/audit/audit";
-import { assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
+import { assertCanComplete, assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
 import type { AuthUser } from "@/server/auth/types";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/server/errors";
 import { isAdmin } from "@/server/auth/types";
@@ -114,6 +114,7 @@ async function completeLinkedTask(tx: Prisma.TransactionClient, caseId: string, 
 
 /** 標記已創稿（僅完成創稿工作，不代表正式發文） */
 export async function markDocumentDrafted(user: AuthUser, id: string) {
+  assertCanComplete(user);
   const doc = await prisma.officialDocument.findUnique({ where: { id } });
   if (!doc) throw new NotFoundError("找不到公文");
   await assertCaseAccess(user, doc.caseId, "edit");
@@ -136,6 +137,7 @@ const dispatchSchema = z.object({
 
 /** 標記已發文：正式發文字號必須由使用者輸入（系統不自動編號） */
 export async function markDocumentDispatched(user: AuthUser, id: string, input: z.input<typeof dispatchSchema>) {
+  assertCanComplete(user);
   const doc = await prisma.officialDocument.findUnique({ where: { id } });
   if (!doc) throw new NotFoundError("找不到公文");
   await assertCaseAccess(user, doc.caseId, "edit");

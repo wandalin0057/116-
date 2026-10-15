@@ -56,7 +56,7 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
   });
 
   it("11. 已完成工作不會被重新設定為未完成，期限亦不變", async () => {
-    const u = await makeUser("pm@example.com");
+    const u = await makeUser("pm@example.com", "ADMIN");
     const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
     const slides = await dueOf(schoolCase.id, "REVIEW_SLIDES_EMAIL");
     await completeTask(u, slides.id);
@@ -116,6 +116,22 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     await updateCase(admin, schoolCase.id, caseInput({ responsibleName: "王工程師", responsibleEmail: "wang@example.com" }));
     const wang = await prisma.user.findUniqueOrThrow({ where: { email: "wang@example.com" } });
     expect(await prisma.task.count({ where: { caseId: schoolCase.id, assignedUserId: wang.id } })).toBe(7);
+  });
+
+  it("標記完成與變更狀態僅限管理員；一般使用者（含負責人）只能檢視進度", async () => {
+    const { updateTaskStatus } = await import("@/server/tasks/task-service");
+    const { markEventHeld } = await import("@/server/cases/case-service");
+    const admin = await makeUser("pm@example.com", "ADMIN");
+    const eng = await makeUser("eng@example.com");
+    const { schoolCase } = await createCase(admin, caseInput({ responsibleUserId: eng.id }));
+    const task = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DISPATCH" } });
+    await expect(completeTask(eng, task.id)).rejects.toThrow(/只有管理員/);
+    await expect(updateTaskStatus(eng, task.id, "IN_PROGRESS")).rejects.toThrow(/只有管理員/);
+    await expect(markEventHeld(eng, schoolCase.id, "REVIEW_MEETING", {})).rejects.toThrow(/只有管理員/);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("NOT_STARTED");
+    await completeTask(admin, task.id);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("COMPLETED");
+    expect(task.title).toBe("提供事前規劃及分析報告書圖說");
   });
 
   it("一般使用者不能以新 Email 自動建立帳號；未填負責人 Email 時提示", async () => {

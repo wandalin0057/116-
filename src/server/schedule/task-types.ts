@@ -2,17 +2,17 @@ import type { DeadlineAnchor, TaskStatus, TaskType } from "@prisma/client";
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   PRE_REPORT_DRAFT: "事前規劃報告書創稿",
-  PRE_REPORT_DISPATCH: "事前規劃報告書發文",
+  PRE_REPORT_DISPATCH: "事前規劃報告書提供圖說",
   REVIEW_SLIDES_EMAIL: "寄送審查簡報",
   REVIEW_MEETING: "審查會議",
   REVIEW_MINUTES_EMAIL: "Email 審查會議紀錄",
   REVIEW_DRAWING_DRAFT: "審查後修正圖說創稿",
-  REVIEW_DRAWING_DISPATCH: "審查後修正圖說發文",
+  REVIEW_DRAWING_DISPATCH: "審查後提供修正圖說",
   SITE_VISIT_SLIDES_UPLOAD: "上傳會勘簡報",
   SITE_VISIT: "現場會勘",
   SITE_VISIT_MINUTES_EMAIL: "Email 會勘紀錄",
   SITE_VISIT_DRAWING_DRAFT: "會勘後修正圖說創稿",
-  SITE_VISIT_DRAWING_DISPATCH: "會勘後修正圖說發文",
+  SITE_VISIT_DRAWING_DISPATCH: "會勘後提供修正圖說",
 };
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
@@ -27,7 +27,7 @@ export const ANCHOR_LABELS: Record<DeadlineAnchor, string> = {
   NOTIFICATION_DATE: "機關通知日",
   REVIEW_MEETING: "審查會議日",
   SITE_VISIT: "會勘日",
-  PRE_REPORT_DISPATCH: "事前規劃報告書發文日",
+  PRE_REPORT_DISPATCH: "事前規劃報告書提供圖說日",
 };
 
 export type TaskCategory = "DRAFT" | "DISPATCH" | "EMAIL" | "UPLOAD" | "EVENT";
@@ -70,7 +70,7 @@ export const TASK_EMAIL_TYPE: Partial<Record<TaskType, "REVIEW_SLIDES_EMAIL" | "
 /** 行事曆顏色（Tailwind class） */
 export const TASK_COLORS: Record<TaskCategory, { bg: string; text: string; border: string; dot: string; label: string }> = {
   DRAFT: { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-300", dot: "bg-amber-500", label: "創稿" },
-  DISPATCH: { bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-300", dot: "bg-blue-600", label: "發文" },
+  DISPATCH: { bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-300", dot: "bg-blue-600", label: "提供圖說" },
   EMAIL: { bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-300", dot: "bg-emerald-600", label: "Email" },
   UPLOAD: { bg: "bg-violet-50", text: "text-violet-800", border: "border-violet-300", dot: "bg-violet-600", label: "上傳簡報" },
   EVENT: { bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-300", dot: "bg-rose-600", label: "會議／會勘" },

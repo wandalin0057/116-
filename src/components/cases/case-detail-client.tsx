@@ -1,4 +1,5 @@
 "use client";
+import { useCanComplete } from "@/components/layout/viewer-context";
 import { CheckCircle2, FilePlus, Loader2, MailPlus, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -13,10 +14,12 @@ import { Select, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function EventHeldButton({ caseId, kind, label }: { caseId: string; kind: "REVIEW_MEETING" | "SITE_VISIT"; label: string }) {
+  const canComplete = useCanComplete();
   const [open, setOpen] = useState(false);
   const [attendees, setAttendees] = useState("");
   const [notes, setNotes] = useState("");
   const { run, pending } = useAction();
+  if (!canComplete) return null;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>

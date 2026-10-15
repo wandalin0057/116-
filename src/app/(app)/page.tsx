@@ -87,7 +87,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Stat label="已逾期" value={d.overdue.length} icon={AlertTriangle} tone="text-red-600" href="#due" />
         <Stat label="本週審查會議" value={d.weekMeetings.length} icon={Users} tone="text-rose-600" href="#week" />
         <Stat label="待創稿" value={d.pendingDraft.length} icon={FilePen} tone="text-amber-700" href="#pending" />
-        <Stat label="待發文" value={d.pendingDispatch.length} icon={FileText} tone="text-blue-800" href="#pending" />
+        <Stat label="待提供圖說" value={d.pendingDispatch.length} icon={FileText} tone="text-blue-800" href="#pending" />
         <Stat label="待寄送 Email" value={d.pendingEmail.length} icon={Mail} tone="text-emerald-700" href="#pending" />
         <Stat label="待上傳簡報" value={d.pendingUpload.length} icon={Upload} tone="text-violet-700" href="#pending" />
         <Stat label="本週會勘" value={d.weekSiteVisits.length} icon={MapPin} tone="text-rose-600" href="#week" />
@@ -129,7 +129,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Tabs defaultValue="draft">
             <TabsList>
               <TabsTrigger value="draft">待創稿（{d.pendingDraft.length}）</TabsTrigger>
-              <TabsTrigger value="dispatch">待發文（{d.pendingDispatch.length}）</TabsTrigger>
+              <TabsTrigger value="dispatch">待提供圖說（{d.pendingDispatch.length}）</TabsTrigger>
               <TabsTrigger value="email">待寄送 Email（{d.pendingEmail.length}）</TabsTrigger>
               <TabsTrigger value="upload">待上傳簡報（{d.pendingUpload.length}）</TabsTrigger>
             </TabsList>
@@ -137,7 +137,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <TaskList tasks={d.pendingDraft} empty="沒有待創稿工作" />
             </TabsContent>
             <TabsContent value="dispatch">
-              <TaskList tasks={d.pendingDispatch} empty="沒有待發文工作" />
+              <TaskList tasks={d.pendingDispatch} empty="沒有待提供圖說工作" />
             </TabsContent>
             <TabsContent value="email">
               <TaskList tasks={d.pendingEmail} empty="沒有待寄送 Email" />

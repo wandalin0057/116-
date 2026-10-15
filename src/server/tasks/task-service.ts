@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { addCalendarDays, dbDateToISOOrNull, isISODate, isoToDbDate, taipeiToday, type ISODate } from "@/lib/dates";
 import { writeAudit } from "@/server/audit/audit";
-import { assertTaskAccess, taskAccessWhere } from "@/server/auth/permissions";
+import { assertCanComplete, assertTaskAccess, taskAccessWhere } from "@/server/auth/permissions";
 import type { AuthUser } from "@/server/auth/types";
 import { loadBusinessDayService } from "@/server/business-days/calendar-repository";
 import { NotFoundError, ValidationError } from "@/server/errors";
@@ -116,6 +116,7 @@ export async function getTask(user: AuthUser, taskId: string) {
 
 /** 標記完成（每一項工作獨立完成；創稿完成不代表發文完成） */
 export async function completeTask(user: AuthUser, taskId: string, completedAt: Date = new Date()) {
+  assertCanComplete(user);
   await assertTaskAccess(user, taskId, "edit");
   const task = await prisma.task.update({
     where: { id: taskId },
@@ -127,6 +128,7 @@ export async function completeTask(user: AuthUser, taskId: string, completedAt: 
 }
 
 export async function updateTaskStatus(user: AuthUser, taskId: string, status: TaskStatus) {
+  assertCanComplete(user);
   await assertTaskAccess(user, taskId, "edit");
   const before = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
   const task = await prisma.task.update({

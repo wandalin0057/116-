@@ -15,8 +15,8 @@ export interface DeadlineRuleDef {
 export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
   {
     taskType: "PRE_REPORT_DISPATCH",
-    title: "事前規劃及分析報告書發文掛件",
-    description: "機關通知日（D0）後第 12 個工作天發文掛件",
+    title: "提供事前規劃及分析報告書圖說",
+    description: "機關通知日（D0）後第 12 個工作天提供圖說",
     anchor: "NOTIFICATION_DATE",
     offsetBusinessDays: 12,
     enabled: true,
@@ -25,7 +25,7 @@ export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
   {
     taskType: "PRE_REPORT_DRAFT",
     title: "建立事前規劃報告書公文草稿",
-    description: "發文前第 1 個工作天完成創稿",
+    description: "提供圖說前第 1 個工作天完成創稿",
     anchor: "PRE_REPORT_DISPATCH",
     offsetBusinessDays: -1,
     enabled: true,
@@ -69,7 +69,7 @@ export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
   },
   {
     taskType: "REVIEW_DRAWING_DISPATCH",
-    title: "正式發文提供審查會議後修正規劃圖說",
+    title: "提供審查會議後修正規劃圖說",
     description: "審查會議後第 3 個工作天",
     anchor: "REVIEW_MEETING",
     offsetBusinessDays: 3,
@@ -114,7 +114,7 @@ export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
   },
   {
     taskType: "SITE_VISIT_DRAWING_DISPATCH",
-    title: "正式發文提供會勘後修正規劃圖說",
+    title: "提供會勘後修正規劃圖說",
     description: "會勘後第 3 個工作天",
     anchor: "SITE_VISIT",
     offsetBusinessDays: 3,

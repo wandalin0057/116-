@@ -1,4 +1,5 @@
 "use client";
+import { useCanComplete } from "@/components/layout/viewer-context";
 import { Ban, Check, CheckCircle2, ImageIcon, Loader2, MailOpen, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -138,6 +139,7 @@ export function EmailEditor({
   signature?: FormattedSignature | null;
 }) {
   const [d, setD] = useState(initial);
+  const canComplete = useCanComplete();
   const [saved, setSaved] = useState(initial);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -270,7 +272,7 @@ export function EmailEditor({
             </p>
           </CardContent>
         </Card>
-        {canEdit && d.status === "DRAFT" && (
+        {canEdit && canComplete && d.status === "DRAFT" && (
           <Card>
             <CardHeader>
               <CardTitle>寄出確認</CardTitle>

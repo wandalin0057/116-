@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { parseTaipeiDateTime } from "@/lib/dates";
 import { writeAudit } from "@/server/audit/audit";
-import { assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
+import { assertCanComplete, assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
 import type { AuthUser } from "@/server/auth/types";
 import { buildEmailVariables } from "@/server/documents/document-variables";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/server/errors";
@@ -138,6 +138,7 @@ export async function updateEmailDraft(user: AuthUser, id: string, input: z.inpu
 
 /** 使用者確認已自行寄出後，標記完成並同步完成對應工作 */
 export async function confirmEmailSent(user: AuthUser, id: string, input: { confirmed: boolean }) {
+  assertCanComplete(user);
   if (input.confirmed !== true) throw new ValidationError("請先確認已由您自行寄出此 Email");
   const draft = await prisma.emailDraft.findUnique({ where: { id } });
   if (!draft) throw new NotFoundError("找不到 Email 草稿");

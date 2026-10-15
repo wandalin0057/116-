@@ -1,4 +1,5 @@
 "use client";
+import { useCanComplete } from "@/components/layout/viewer-context";
 import type { TaskStatus, TaskType } from "@prisma/client";
 import { CheckCircle2, ExternalLink, Eye, FileText, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
@@ -30,6 +31,7 @@ export function TaskActions({ taskId, caseId, taskType, status, title, uploadUrl
   const docType = TASK_DOCUMENT_TYPE[taskType];
   const emailType = TASK_EMAIL_TYPE[taskType];
   const closed = status === "COMPLETED" || status === "CANCELLED";
+  const canComplete = useCanComplete();
 
   const open = (fn: () => Promise<{ ok: boolean; message?: string; data?: { id: string } }>, base: string) =>
     start(async () => {
@@ -74,7 +76,7 @@ export function TaskActions({ taskId, caseId, taskType, status, title, uploadUrl
             未設定上傳網址
           </Button>
         ))}
-      {!closed && (
+      {!closed && canComplete && (
         <ActionButton
           size={size}
           variant="success"
@@ -83,7 +85,7 @@ export function TaskActions({ taskId, caseId, taskType, status, title, uploadUrl
             title: "確認標記完成？",
             description:
               docType && taskType.endsWith("_DRAFT")
-                ? `「${title}」標記完成僅代表創稿完成，正式發文需另行標記。`
+                ? `「${title}」標記完成僅代表創稿完成，提供圖說需另行標記。`
                 : emailType
                   ? `請確認您已自行寄出「${title}」相關 Email。`
                   : `確認「${title}」已完成。`,

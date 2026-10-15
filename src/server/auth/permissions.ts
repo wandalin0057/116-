@@ -55,3 +55,8 @@ export async function assertTaskAccess(user: AuthUser, taskId: string, level: Ac
 export function assertAdmin(user: AuthUser) {
   if (!isAdmin(user)) throw new ForbiddenError("此功能僅限管理員使用");
 }
+
+/** 標記完成與變更工作狀態僅限管理員（專案經理），其他人只能檢視進度 */
+export function assertCanComplete(user: AuthUser): void {
+  if (user.role !== "ADMIN") throw new ForbiddenError("只有管理員可以標記完成或變更工作狀態");
+}
