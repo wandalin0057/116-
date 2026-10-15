@@ -36,7 +36,8 @@ describe("格式化簽名檔（逐字設定樣式）", () => {
   it("內文 {signature} 換成格式化簽名檔，內文中的 Email 與網址變成超連結", () => {
     const sig = { html: '<p style="margin:0"><span style="color:#ff0000">林映辰</span></p>', text: "林映辰" };
     const html = buildEmailHtml("您好，\n請查收 https://example.com/a\n聯絡 wanda@example.com\n\n{signature}", sig);
-    expect(html).toContain("您好，<br>");
+    expect(html).toContain('<p style="margin:0">您好，</p>');
+    expect(html).toContain('<p style="margin:0">&nbsp;</p>');
     expect(html).toContain('<a href="https://example.com/a" style="color:#0563c1;text-decoration:underline">https://example.com/a</a>');
     expect(html).toContain('href="mailto:wanda@example.com" style="color:#0563c1;text-decoration:underline">wanda@example.com</a>');
     expect(html).toContain('<span style="color:#ff0000">林映辰</span>');

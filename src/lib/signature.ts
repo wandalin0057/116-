@@ -89,24 +89,35 @@ export function signatureText(sig: FormattedSignature | null, fallback = ""): st
   return sig?.text.trim() || fallback;
 }
 
-/** 網址與 Email 轉為超連結（輸入須為已跳脫之文字） */
 /** 超連結樣式（Outlook 預設的藍色底線） */
 export const LINK_STYLE = "color:#0563c1;text-decoration:underline";
 
+/** 網址與 Email 轉為超連結（輸入須為已跳脫之文字） */
 export function linkifyEscaped(s: string): string {
   return s
     .replace(/(https?:\/\/[^\s<]+)/g, `<a href="$1" style="${LINK_STYLE}">$1</a>`)
     .replace(/(^|[\s>（(：:，,])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?![^<]*<\/a>)/g, `$1<a href="mailto:$2" style="${LINK_STYLE}">$2</a>`);
 }
 
+/** Email 內文預設字型（Outlook 中文字需另指定 mso-fareast-font-family） */
+export const EMAIL_BODY_FONT = `font-family:${SIGNATURE_FONTS.jhenghei.css};mso-fareast-font-family:'Microsoft JhengHei';font-size:12pt`;
+/** 簽名檔未另設樣式的文字（與簽名檔編輯器一致） */
+export const SIGNATURE_BASE_FONT = `font-family:${SIGNATURE_FONTS.jhenghei.css};mso-fareast-font-family:'Microsoft JhengHei';font-size:10pt`;
+
 /**
- * Email 內文轉 HTML：內文保留換行、網址與 Email 轉超連結；{signature} 換成格式化簽名檔。
+ * Email 內文轉 HTML：每行一個段落（與 Outlook 相同的結構），網址與 Email 轉超連結；
+ * {signature} 換成格式化簽名檔。
  */
 export function buildEmailHtml(body: string, sig: FormattedSignature | null): string {
-  const part = (t: string) => linkifyEscaped(escapeHtml(t)).replace(/\n/g, "<br>");
+  const part = (t: string) => {
+    const lines = t.split("\n");
+    if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+    if (lines.length === 1 && lines[0] === "") return "";
+    return lines.map((l) => `<p style="margin:0">${l ? linkifyEscaped(escapeHtml(l)) : "&nbsp;"}</p>`).join("");
+  };
   const html = body
     .split("{signature}")
     .map(part)
-    .join(sig ? `<div style="line-height:1.4">${sig.html}</div>` : "");
-  return `<div style="font-family:${SIGNATURE_FONTS.jhenghei.css};font-size:12pt">${html}</div>`;
+    .join(sig ? `<div style="${SIGNATURE_BASE_FONT}">${sig.html}</div>` : "");
+  return `<div style="${EMAIL_BODY_FONT}">${html}</div>`;
 }

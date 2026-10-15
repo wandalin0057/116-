@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DeleteEmailDraftButton } from "./delete-email-draft-button";
+import { toOutlookHtml } from "@/lib/outlook-html";
 import { buildEmailHtml, signatureText, type FormattedSignature } from "@/lib/signature";
 
 interface Draft {
@@ -48,7 +49,8 @@ function RichCopyButton({ html, text, hasImage }: { html: string; text: string; 
           if (typeof ClipboardItem === "undefined") throw new Error("unsupported");
           await navigator.clipboard.write([
             new ClipboardItem({
-              "text/html": new Blob([html], { type: "text/html" }),
+              // 轉成 Outlook 相容格式（行內字型、十六進位顏色、圖片寬高）
+              "text/html": toOutlookHtml(html).then((h) => new Blob([h], { type: "text/html" })),
               "text/plain": new Blob([text], { type: "text/plain" }),
             }),
           ]);
