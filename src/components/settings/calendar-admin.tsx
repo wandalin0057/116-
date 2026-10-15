@@ -36,6 +36,15 @@ export function CaseDiffList({ diffs }: { diffs: CaseDiff[] }) {
   );
 }
 
+/** 政府開放資料的 CSV 可能是 UTF-8 或 Big5 編碼，先試 UTF-8，失敗再用 Big5 */
+function decodeCalendarFile(buf: ArrayBuffer): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder("big5").decode(buf);
+  }
+}
+
 export function CalendarImportForm() {
   const router = useRouter();
   const [file, setFile] = useState<{ name: string; text: string } | null>(null);
@@ -49,7 +58,7 @@ export function CalendarImportForm() {
     setPreview(null);
     if (!f) return setFile(null);
     if (f.size > 2_000_000) return alert("檔案過大（上限 2MB）");
-    setFile({ name: f.name, text: await f.text() });
+    setFile({ name: f.name, text: decodeCalendarFile(await f.arrayBuffer()) });
   };
 
   return (
@@ -82,7 +91,7 @@ export function CalendarImportForm() {
             <ul className="mt-1 list-inside list-disc text-sm">
               {preview.parsed.years.map((y) => (
                 <li key={y.year}>
-                  {y.year} 年（民國 {y.year - 1911} 年）：平日放假 {y.days.filter((d) => d.kind === "HOLIDAY").length} 筆、補行上班 {y.days.filter((d) => d.kind === "MAKEUP_WORKDAY").length} 筆，
+                  {y.year} 年（民國 {y.year - 1911} 年）：放假日 {y.days.filter((d) => d.kind === "HOLIDAY").length} 筆、補行上班 {y.days.filter((d) => d.kind === "MAKEUP_WORKDAY").length} 筆，
                   {y.isComplete ? <span className="text-emerald-700">完整日曆</span> : <span className="text-amber-700">非完整日曆（期限將標示暫估）</span>}
                 </li>
               ))}
