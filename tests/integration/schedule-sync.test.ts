@@ -96,4 +96,32 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     await createCase(u, caseInput({ responsibleUserId: u.id }));
     await expect(createCase(u, caseInput({ responsibleUserId: u.id, projectCode: "tp-001" }))).rejects.toThrow(/案件編號已存在/);
   });
+
+  it("新增案件時填寫負責人姓名與 Email：新 Email 自動建立提醒收件帳號，既有 Email 直接連結", async () => {
+    const { authenticate } = await import("@/server/auth/login");
+    const admin = await makeUser("pm@example.com", "ADMIN", "林經理");
+    const { schoolCase } = await createCase(admin, caseInput({ responsibleName: "陳工程師", responsibleEmail: "Chen@Example.com" }));
+    const chen = await prisma.user.findUniqueOrThrow({ where: { email: "chen@example.com" } });
+    expect(chen).toMatchObject({ name: "陳工程師", role: "USER", isActive: true });
+    expect(schoolCase.responsibleUserId).toBe(chen.id);
+    // 工作指派給負責人（提醒信寄給他）
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id, assignedUserId: chen.id } })).toBe(7);
+    // 自動建立的帳號不能直接登入
+    expect((await authenticate("chen@example.com", "")).ok).toBe(false);
+    // 第二所學校用同一個 Email：不重複建立帳號
+    const second = await createCase(admin, caseInput({ projectCode: "TP-002", responsibleName: "陳工程師", responsibleEmail: "chen@example.com" }));
+    expect(second.schoolCase.responsibleUserId).toBe(chen.id);
+    expect(await prisma.user.count({ where: { email: "chen@example.com" } })).toBe(1);
+    // 改負責人：工作轉給新負責人
+    await updateCase(admin, schoolCase.id, caseInput({ responsibleName: "王工程師", responsibleEmail: "wang@example.com" }));
+    const wang = await prisma.user.findUniqueOrThrow({ where: { email: "wang@example.com" } });
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id, assignedUserId: wang.id } })).toBe(7);
+  });
+
+  it("一般使用者不能以新 Email 自動建立帳號；未填負責人 Email 時提示", async () => {
+    const u = await makeUser("user@example.com");
+    await expect(createCase(u, caseInput({ responsibleName: "新人", responsibleEmail: "new@example.com" }))).rejects.toThrow(/尚未建立帳號/);
+    await expect(createCase(u, caseInput({}))).rejects.toThrow(/負責人 Email/);
+    await expect(createCase(u, caseInput({ responsibleName: "我", responsibleEmail: "user@example.com" }))).resolves.toBeTruthy();
+  });
 });

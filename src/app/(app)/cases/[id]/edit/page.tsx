@@ -14,7 +14,7 @@ export default async function EditCasePage({ params }: { params: Promise<{ id: s
   const user = await requireUser();
   if (!(await canAccessCase(user, id, "edit"))) notFound();
   const [c, users, names] = await Promise.all([
-    prisma.schoolCase.findUniqueOrThrow({ where: { id } }),
+    prisma.schoolCase.findUniqueOrThrow({ where: { id }, include: { responsibleUser: { select: { name: true, email: true } } } }),
     listUsers(),
     prisma.schoolCase.findMany({ distinct: ["projectName"], select: { projectName: true } }),
   ]);
@@ -24,8 +24,9 @@ export default async function EditCasePage({ params }: { params: Promise<{ id: s
       <CaseForm
         mode="edit"
         caseId={id}
-        initial={caseToFormValues(c, { responsibleUserId: c.responsibleUserId })}
-        users={users.map((u) => ({ id: u.id, name: u.name }))}
+        initial={caseToFormValues(c, { responsible: c.responsibleUser })}
+        users={users.map((u) => ({ id: u.id, name: u.name, email: u.email }))}
+        canCreateResponsible={user.role === "ADMIN"}
         projectNames={names.map((n) => n.projectName)}
       />
     </>

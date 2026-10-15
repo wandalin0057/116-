@@ -56,7 +56,16 @@ export const caseInputSchema = z.object({
     .optional()
     .refine((v) => !v || v.split(/[,;，；\s]+/).filter(Boolean).every((e) => z.string().email().safeParse(e).success), "Email 格式錯誤")
     .transform((v) => (v ? v : null)),
-  responsibleUserId: z.string().min(1, "請選擇負責人"),
+  /** 負責人：可直接指定帳號，或填寫姓名與 Email（新 Email 會自動建立提醒收件帳號） */
+  responsibleUserId: z.string().trim().optional().transform((v) => (v ? v : null)),
+  responsibleName: z.string().trim().max(50, "負責人姓名不可超過 50 字").optional().transform((v) => (v ? v : null)),
+  responsibleEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .optional()
+    .refine((v) => !v || z.string().email().safeParse(v).success, "負責人 Email 格式錯誤")
+    .transform((v) => (v ? v : null)),
   notificationDate: optionalDate,
   reviewMeetingDateTime: optionalDateTime,
   reviewMeetingLocation: optionalText(200),

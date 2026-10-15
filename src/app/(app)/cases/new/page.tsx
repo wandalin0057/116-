@@ -18,8 +18,9 @@ export default async function NewCasePage() {
       <PageHeader title="新增學校案件" description="每所學校建立一筆案件；建立後系統依期限規則自動產生工作項目。" />
       <CaseForm
         mode="create"
-        initial={caseToFormValues(null, { responsibleUserId: user.id })}
-        users={users.map((u) => ({ id: u.id, name: u.name }))}
+        initial={caseToFormValues(null, {})}
+        users={users.map((u) => ({ id: u.id, name: u.name, email: u.email }))}
+        canCreateResponsible={user.role === "ADMIN"}
         projectNames={[...new Set(["115年度臺北市通學區規劃分析案", ...names.map((n) => n.projectName)])]}
       />
     </>

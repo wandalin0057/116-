@@ -20,7 +20,10 @@ type CaseRow = {
   notes: string | null;
 };
 
-export function caseToFormValues(c: CaseRow | null, defaults: { responsibleUserId: string; projectName?: string }) {
+export function caseToFormValues(
+  c: CaseRow | null,
+  defaults: { responsible?: { name: string; email: string } | null; projectName?: string },
+) {
   return {
     projectCode: c?.projectCode ?? "",
     projectName: c?.projectName ?? defaults.projectName ?? DEFAULT_PROJECT_NAME,
@@ -29,7 +32,9 @@ export function caseToFormValues(c: CaseRow | null, defaults: { responsibleUserI
     agencyName: c?.agencyName ?? "臺北市政府交通局",
     agencyContact: c?.agencyContact ?? "",
     agencyEmail: c?.agencyEmail ?? "",
-    responsibleUserId: c?.responsibleUserId ?? defaults.responsibleUserId,
+    responsibleUserId: "",
+    responsibleName: defaults.responsible?.name ?? "",
+    responsibleEmail: defaults.responsible?.email ?? "",
     notificationDate: dbDateToISOOrNull(c?.notificationDate) ?? "",
     reviewMeetingDateTime: toTaipeiDateTimeInput(c?.reviewMeetingDateTime),
     reviewMeetingLocation: c?.reviewMeetingLocation ?? "",

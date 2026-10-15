@@ -37,18 +37,23 @@ export function CaseForm({
   initial,
   users,
   projectNames,
+  canCreateResponsible = false,
 }: {
   mode: "create" | "edit";
   caseId?: string;
   initial: FormValues;
-  users: { id: string; name: string }[];
+  users: { id: string; name: string; email: string }[];
   projectNames: string[];
+  canCreateResponsible?: boolean;
 }) {
   const router = useRouter();
   const [v, setV] = useState<FormValues>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<ScheduleChange[] | null>(null);
   const { run, pending } = useAction();
+  const emailTrim = v.responsibleEmail.trim().toLowerCase();
+  const responsibleMatch = users.find((u) => u.email.toLowerCase() === emailTrim);
+  const responsibleIsNew = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrim) && !responsibleMatch;
   const set = (k: keyof FormValues) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setV((s) => ({ ...s, [k]: e.target.value }));
   const datesChanged =
     v.notificationDate !== initial.notificationDate || v.reviewMeetingDateTime !== initial.reviewMeetingDateTime || v.siteVisitDateTime !== initial.siteVisitDateTime;
@@ -123,15 +128,62 @@ export function CaseForm({
               ))}
             </datalist>
           </Field>
-          <Field label="負責人" name="responsibleUserId" error={errors.responsibleUserId} required>
-            <Select id="responsibleUserId" value={v.responsibleUserId} onChange={set("responsibleUserId")} required>
-              <option value="">請選擇</option>
+          <Field label="負責人姓名" name="responsibleName" error={errors.responsibleName} required hint="可直接輸入，或從清單選擇既有同事">
+            <Input
+              id="responsibleName"
+              list="responsible-names"
+              value={v.responsibleName}
+              onChange={(e) => {
+                const name = e.target.value;
+                const match = users.find((u) => u.name === name);
+                setV((s) => ({ ...s, responsibleName: name, responsibleEmail: match ? match.email : s.responsibleEmail }));
+              }}
+              placeholder="例如：陳工程師"
+              required
+            />
+            <datalist id="responsible-names">
               {users.map((u) => (
-                <option key={u.id} value={u.id}>
+                <option key={u.id} value={u.name}>
+                  {u.email}
+                </option>
+              ))}
+            </datalist>
+          </Field>
+          <Field
+            label="負責人 Email（提醒信寄送對象）"
+            name="responsibleEmail"
+            error={errors.responsibleEmail}
+            required
+            hint={
+              responsibleIsNew
+                ? canCreateResponsible
+                  ? "此 Email 尚無帳號：儲存時會自動建立「僅收提醒」的帳號"
+                  : "此 Email 尚無帳號，請洽管理員新增"
+                : responsibleMatch
+                  ? `既有同事：${responsibleMatch.name}`
+                  : undefined
+            }
+          >
+            <Input
+              id="responsibleEmail"
+              type="email"
+              list="responsible-emails"
+              value={v.responsibleEmail}
+              onChange={(e) => {
+                const email = e.target.value;
+                const match = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+                setV((s) => ({ ...s, responsibleEmail: email, responsibleName: match && !s.responsibleName ? match.name : s.responsibleName }));
+              }}
+              placeholder="name@example.com"
+              required
+            />
+            <datalist id="responsible-emails">
+              {users.map((u) => (
+                <option key={u.id} value={u.email}>
                   {u.name}
                 </option>
               ))}
-            </Select>
+            </datalist>
           </Field>
           <Field label="案件狀態" name="status" error={errors.status}>
             <Select id="status" value={v.status} onChange={set("status")}>

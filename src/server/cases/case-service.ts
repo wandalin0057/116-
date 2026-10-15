@@ -8,7 +8,48 @@ import { ForbiddenError, NotFoundError, ValidationError } from "@/server/errors"
 import { orderBy } from "@/server/query-utils";
 import type { ScheduleChange } from "@/server/schedule/schedule-calculator";
 import { computeCaseScheduleChanges, syncCaseTasks } from "@/server/schedule/task-sync";
+import { randomToken } from "@/lib/crypto";
+import { hashPassword } from "@/server/auth/password";
 import { caseInputSchema, type CaseInput, type CaseParsed } from "./case-schema";
+
+type ResolvedCase = Omit<CaseParsed, "responsibleUserId"> & { responsibleUserId: string };
+
+/**
+ * 依負責人 Email 找到帳號；Email 尚無帳號時（限管理員）自動建立「提醒收件帳號」。
+ * 自動建立之帳號無法登入（密碼為隨機值），需要登入時由管理員於使用者管理重設密碼。
+ */
+async function resolveResponsible(actor: AuthUser, p: CaseParsed): Promise<ResolvedCase> {
+  if (p.responsibleEmail) {
+    const existing = await prisma.user.findUnique({ where: { email: p.responsibleEmail } });
+    if (existing) {
+      if (!existing.isActive) throw new ValidationError("此負責人帳號已停用，請至使用者管理重新啟用", { responsibleEmail: ["帳號已停用"] });
+      return { ...p, responsibleUserId: existing.id };
+    }
+    if (!isAdmin(actor)) {
+      throw new ValidationError("此 Email 尚未建立帳號，請洽管理員新增，或改填既有同事的 Email", { responsibleEmail: ["尚無此帳號"] });
+    }
+    if (!p.responsibleName) throw new ValidationError("新負責人請填寫姓名", { responsibleName: ["請填寫負責人姓名"] });
+    const created = await prisma.user.create({
+      data: {
+        email: p.responsibleEmail,
+        name: p.responsibleName,
+        role: "USER",
+        passwordHash: await hashPassword(randomToken(24)),
+        reminderPreference: { create: {} },
+      },
+    });
+    await writeAudit({
+      actorId: actor.id,
+      action: "USER_CREATE",
+      entityType: "User",
+      entityId: created.id,
+      summary: `由學校案件建立負責人帳號 ${created.name}（${created.email}），僅收提醒、尚未設定登入密碼`,
+    });
+    return { ...p, responsibleUserId: created.id };
+  }
+  if (!p.responsibleUserId) throw new ValidationError("請填寫負責人 Email", { responsibleEmail: ["請填寫負責人 Email"] });
+  return { ...p, responsibleUserId: p.responsibleUserId };
+}
 
 function parseInput(input: CaseInput): CaseParsed {
   const parsed = caseInputSchema.safeParse(input);
@@ -18,7 +59,7 @@ function parseInput(input: CaseInput): CaseParsed {
   return parsed.data;
 }
 
-function toDbFields(p: CaseParsed) {
+function toDbFields(p: ResolvedCase) {
   return {
     projectCode: p.projectCode,
     projectName: p.projectName,
@@ -82,7 +123,7 @@ async function syncEventRecords(
 }
 
 export async function createCase(user: AuthUser, input: CaseInput, meta: { ipAddress?: string | null } = {}) {
-  const p = parseInput(input);
+  const p = await resolveResponsible(user, parseInput(input));
   await assertResponsibleUser(p.responsibleUserId);
   await assertUniqueCode(p.projectCode);
   const data = toDbFields(p);
@@ -123,7 +164,13 @@ export async function updateCase(user: AuthUser, caseId: string, input: CaseInpu
   await assertCaseAccess(user, caseId, "edit");
   const before = await prisma.schoolCase.findUnique({ where: { id: caseId } });
   if (!before) throw new NotFoundError("找不到此案件");
-  const p = parseInput(input);
+  const parsed = parseInput(input);
+  // 變更負責人之權限需在建立新帳號前檢查
+  if (parsed.responsibleEmail && !isAdmin(user) && before.responsibleUserId !== user.id) {
+    const current = await prisma.user.findUnique({ where: { id: before.responsibleUserId }, select: { email: true } });
+    if (current?.email !== parsed.responsibleEmail) throw new ForbiddenError("僅管理員或案件負責人可變更負責人");
+  }
+  const p = await resolveResponsible(user, parsed);
   if (p.responsibleUserId !== before.responsibleUserId) {
     if (!isAdmin(user) && before.responsibleUserId !== user.id) throw new ForbiddenError("僅管理員或案件負責人可變更負責人");
     await assertResponsibleUser(p.responsibleUserId);

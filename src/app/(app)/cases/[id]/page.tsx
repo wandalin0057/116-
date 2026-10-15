@@ -86,7 +86,10 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
           <CardContent>
             <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <Info label="行政區">{c.district}</Info>
-              <Info label="負責人">{c.responsibleUser.name}</Info>
+              <Info label="負責人">
+                {c.responsibleUser.name}
+                <span className="block text-xs text-muted-foreground">{c.responsibleUser.email}</span>
+              </Info>
               <Info label="機關">{c.agencyName}</Info>
               <Info label="承辦人">
                 {c.agencyContact}
