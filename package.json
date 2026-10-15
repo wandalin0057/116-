@@ -22,9 +22,6 @@
     "cron:daily-reminders": "tsx scripts/run-daily-reminders.ts",
     "backup:json": "tsx scripts/backup-json.ts"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
     "@prisma/client": "^6.19.3",
@@ -38,6 +35,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "docx": "^9.11.0",
+    "dotenv": "^16.6.1",
     "lucide-react": "^0.577.0",
     "next": "15.5.27",
     "nodemailer": "^10.1.1",

@@ -62,7 +62,18 @@ async function seedAdmin() {
     return;
   }
   const err = validatePasswordStrength(password);
-  if (err) throw new Error(`INITIAL_ADMIN_PASSWORD 不符密碼規則：${err}`);
+  if (err) {
+    throw new Error(
+      [
+        "",
+        "════════════════════════════════════════════",
+        `✗ 無法建立管理員：INITIAL_ADMIN_PASSWORD 不符密碼規則（${err}）`,
+        `  目前長度 ${password.length} 個字元；規則：至少 10 個字元，且需同時包含英文字母與數字。`,
+        "  請到 Render → Environment 修改 INITIAL_ADMIN_PASSWORD 後按 Save Changes。",
+        "════════════════════════════════════════════",
+      ].join("\n"),
+    );
+  }
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     console.log(`• 管理員 ${email} 已存在，未變更密碼`);

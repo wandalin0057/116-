@@ -20,7 +20,7 @@ ENV NODE_ENV=production \
     PDF_FONT_PATH=/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc \
     PDF_FONT_FAMILY=WenQuanYiZenHei
 RUN groupadd --system app && useradd --system --gid app --home /app app
-COPY --from=build --chown=app:app /app/package.json /app/package-lock.json /app/tsconfig.json ./
+COPY --from=build --chown=app:app /app/package.json /app/package-lock.json /app/tsconfig.json /app/prisma.config.ts ./
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/.next/standalone ./.next/standalone
 COPY --from=build --chown=app:app /app/prisma ./prisma
