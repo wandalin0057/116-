@@ -2,7 +2,7 @@
 import { CheckCircle2, FilePlus, Loader2, MailPlus, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { deleteCaseAction, markEventHeldAction, setCaseMemberAction } from "@/app/actions/cases";
+import { markEventHeldAction, setCaseMemberAction } from "@/app/actions/cases";
 import { createDocumentAction } from "@/app/actions/documents";
 import { createEmailDraftAction } from "@/app/actions/emails";
 import { ActionButton } from "@/components/common/action-button";
@@ -150,21 +150,5 @@ export function MemberManager({
         </div>
       )}
     </div>
-  );
-}
-
-export function DeleteCaseButton({ caseId, name }: { caseId: string; name: string }) {
-  const router = useRouter();
-  return (
-    <ActionButton
-      variant="outline"
-      className="text-red-700"
-      action={() => deleteCaseAction(caseId)}
-      onDone={() => router.push("/cases")}
-      confirm={{ title: `刪除案件「${name}」？`, description: "刪除後無法復原。已有公文或 Email 草稿之案件不可刪除，請改設為「已取消」。", destructive: true, confirmLabel: "刪除" }}
-    >
-      <Trash2 />
-      刪除
-    </ActionButton>
   );
 }

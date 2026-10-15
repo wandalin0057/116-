@@ -278,6 +278,7 @@ export async function listCases(user: AuthUser, query: CaseListQuery) {
       include: {
         responsibleUser: { select: { id: true, name: true } },
         tasks: { select: { status: true } },
+        _count: { select: { documents: true, emailDrafts: true } },
       },
     }),
   ]);
@@ -309,16 +310,44 @@ export async function getCaseDetail(user: AuthUser, caseId: string) {
   });
 }
 
-/** 刪除限制：僅管理員可刪除，且案件尚無公文與 Email 草稿 */
-export async function deleteCase(user: AuthUser, caseId: string, meta: { ipAddress?: string | null } = {}) {
+/**
+ * 刪除案件（僅管理員）：一併刪除工作、會議／會勘紀錄、公文與 Email 草稿。
+ * 案件已有公文或 Email 草稿時，需輸入案件編號確認，避免誤刪。
+ * 操作紀錄保留案件資料與已發文之發文字號。
+ */
+export async function deleteCase(
+  user: AuthUser,
+  caseId: string,
+  options: { confirmCode?: string; ipAddress?: string | null } = {},
+) {
   if (!isAdmin(user)) throw new ForbiddenError("僅管理員可刪除案件");
-  const c = await prisma.schoolCase.findUnique({ where: { id: caseId }, include: { _count: { select: { documents: true, emailDrafts: true } } } });
+  const c = await prisma.schoolCase.findUnique({
+    where: { id: caseId },
+    include: {
+      documents: { select: { status: true, documentNumber: true } },
+      _count: { select: { tasks: true, emailDrafts: true } },
+    },
+  });
   if (!c) throw new NotFoundError("找不到此案件");
-  if (c._count.documents || c._count.emailDrafts) {
-    throw new ValidationError("此案件已有公文或 Email 草稿紀錄，不可刪除；請改將狀態設為「已取消」");
+  const hasRecords = c.documents.length > 0 || c._count.emailDrafts > 0;
+  if (hasRecords && options.confirmCode?.trim() !== c.projectCode) {
+    throw new ValidationError(`此案件含公文或 Email 草稿，請輸入案件編號「${c.projectCode}」確認刪除`);
   }
-  await prisma.schoolCase.delete({ where: { id: caseId } });
-  await writeAudit({ actorId: user.id, action: "CASE_DELETE", entityType: "SchoolCase", entityId: caseId, summary: `刪除案件 ${c.projectCode} ${c.schoolName}`, ipAddress: meta.ipAddress });
+  const dispatched = c.documents.filter((d) => d.status === "DISPATCHED").map((d) => d.documentNumber ?? "（無字號）");
+  await prisma.$transaction([
+    prisma.emailDraft.deleteMany({ where: { caseId } }),
+    prisma.officialDocument.deleteMany({ where: { caseId } }),
+    prisma.schoolCase.delete({ where: { id: caseId } }),
+  ]);
+  await writeAudit({
+    actorId: user.id,
+    action: "CASE_DELETE",
+    entityType: "SchoolCase",
+    entityId: caseId,
+    summary: `刪除案件 ${c.projectCode} ${c.schoolName}（工作 ${c._count.tasks}、公文 ${c.documents.length}、Email 草稿 ${c._count.emailDrafts}）`,
+    changes: { projectCode: c.projectCode, projectName: c.projectName, schoolName: c.schoolName, dispatchedDocumentNumbers: dispatched },
+    ipAddress: options.ipAddress,
+  });
 }
 
 export async function setCaseMember(user: AuthUser, caseId: string, memberUserId: string, role: "EDITOR" | "VIEWER" | null) {

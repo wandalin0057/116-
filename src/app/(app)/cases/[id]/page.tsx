@@ -1,7 +1,8 @@
 import { CalendarClock, ExternalLink, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CreateDocumentButtons, CreateEmailButtons, DeleteCaseButton, EventHeldButton, MemberManager } from "@/components/cases/case-detail-client";
+import { CreateDocumentButtons, CreateEmailButtons, EventHeldButton, MemberManager } from "@/components/cases/case-detail-client";
+import { DeleteCaseButton } from "@/components/cases/delete-case-button";
 import { PageHeader } from "@/components/common/page-header";
 import { DueDateText, TaskStatusBadge, TaskTypeBadge } from "@/components/tasks/badges";
 import { TaskActions } from "@/components/tasks/task-actions";
@@ -76,7 +77,16 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
                 案件行事曆
               </Link>
             </Button>
-            {isAdmin(user) && <DeleteCaseButton caseId={c.id} name={c.schoolName} />}
+            {isAdmin(user) && (
+              <DeleteCaseButton
+                caseId={c.id}
+                schoolName={c.schoolName}
+                projectCode={c.projectCode}
+                counts={{ tasks: c.tasks.length, documents: c.documents.length, emails: c.emailDrafts.length }}
+                redirectTo="/cases"
+                size="default"
+              />
+            )}
           </>
         }
       />

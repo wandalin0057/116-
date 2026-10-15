@@ -11,6 +11,8 @@ import { requireUser } from "@/lib/auth";
 import { dbDateToISOOrNull, formatROCDateTime, formatROCShort } from "@/lib/dates";
 import { CASE_STATUS_LABELS, TAIPEI_DISTRICTS } from "@/server/cases/case-schema";
 import { listCases } from "@/server/cases/case-service";
+import { DeleteCaseButton } from "@/components/cases/delete-case-button";
+import { isAdmin } from "@/server/auth/types";
 import { listUsers } from "@/server/users/user-service";
 import { countCasesByProject, listProjectNames, shortProjectLabel } from "@/server/cases/projects";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,7 @@ type SP = Record<string, string | undefined>;
 
 export default async function CasesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
+  const admin = isAdmin(user);
   const sp = await searchParams;
   const [result, users, projectNames, projectCounts] = await Promise.all([
     listCases(user, {
@@ -111,6 +114,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
                   <TH>
                     <SortHeader label="狀態" field="status" {...sortProps} />
                   </TH>
+                  {admin && <TH>操作</TH>}
                 </TR>
               </THead>
               <TBody>
@@ -134,6 +138,16 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
                     <TD>
                       <Badge variant={c.status === "ACTIVE" ? "info" : c.status === "COMPLETED" ? "success" : "muted"}>{CASE_STATUS_LABELS[c.status]}</Badge>
                     </TD>
+                    {admin && (
+                      <TD>
+                        <DeleteCaseButton
+                          caseId={c.id}
+                          schoolName={c.schoolName}
+                          projectCode={c.projectCode}
+                          counts={{ tasks: c.tasks.length, documents: c._count.documents, emails: c._count.emailDrafts }}
+                        />
+                      </TD>
+                    )}
                   </TR>
                 ))}
               </TBody>

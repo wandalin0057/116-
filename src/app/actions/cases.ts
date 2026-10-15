@@ -24,8 +24,8 @@ export async function updateCaseAction(caseId: string, input: CaseInput) {
   }, "案件已更新");
 }
 
-export async function deleteCaseAction(caseId: string) {
-  return runAction(async () => deleteCase(await requireUserForAction(), caseId, await getRequestMeta()), "案件已刪除");
+export async function deleteCaseAction(caseId: string, confirmCode?: string) {
+  return runAction(async () => deleteCase(await requireUserForAction(), caseId, { confirmCode, ...(await getRequestMeta()) }), "案件已刪除");
 }
 
 export async function setCaseMemberAction(caseId: string, userId: string, role: "EDITOR" | "VIEWER" | null) {

@@ -125,4 +125,31 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     expect(await prisma.auditLog.count({ where: { action: "EMAIL_DRAFT_DELETE" } })).toBe(2);
     expect((await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "REVIEW_MINUTES_EMAIL" } })).status).toBe("COMPLETED");
   });
+
+  it("刪除學校案件：僅管理員；含公文／Email 時需輸入案件編號，並一併刪除", async () => {
+    const { deleteCase } = await import("@/server/cases/case-service");
+    const admin = await makeUser("admin@example.com", "ADMIN");
+    const u = await makeUser("pm@example.com");
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const doc = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "PRE_REPORT" });
+    await markDocumentDispatched(u, doc.id, { documentNumber: "交顧字第1150009號", dispatchDate: "2026-11-02" });
+    await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_SLIDES_EMAIL" });
+
+    await expect(deleteCase(u, schoolCase.id, { confirmCode: "TP-001" })).rejects.toThrow(/僅管理員/);
+    await expect(deleteCase(admin, schoolCase.id)).rejects.toThrow(/請輸入案件編號/);
+    await expect(deleteCase(admin, schoolCase.id, { confirmCode: "TP-999" })).rejects.toThrow(/請輸入案件編號/);
+    await deleteCase(admin, schoolCase.id, { confirmCode: "TP-001" });
+
+    expect(await prisma.schoolCase.count({ where: { id: schoolCase.id } })).toBe(0);
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(0);
+    expect(await prisma.officialDocument.count({ where: { caseId: schoolCase.id } })).toBe(0);
+    expect(await prisma.emailDraft.count({ where: { caseId: schoolCase.id } })).toBe(0);
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { action: "CASE_DELETE" } });
+    expect(JSON.stringify(log.changes)).toContain("交顧字第1150009號");
+
+    // 沒有公文／Email 的案件不需輸入編號
+    const second = await createCase(u, caseInput({ responsibleUserId: u.id, projectCode: "TP-002" }));
+    await deleteCase(admin, second.schoolCase.id);
+    expect(await prisma.schoolCase.count()).toBe(0);
+  });
 });
