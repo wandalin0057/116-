@@ -1,5 +1,6 @@
 "use client";
-import { Ban, CheckCircle2, Loader2, MailOpen, Save } from "lucide-react";
+import { Ban, Check, CheckCircle2, ImageIcon, Loader2, MailOpen, Save } from "lucide-react";
+import { toast } from "sonner";
 import { useState } from "react";
 import { cancelEmailDraftAction, confirmEmailSentAction, updateEmailDraftAction } from "@/app/actions/emails";
 import { ActionButton } from "@/components/common/action-button";
@@ -11,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DeleteEmailDraftButton } from "./delete-email-draft-button";
+import { buildEmailHtml } from "./email-html";
 
 interface Draft {
   id: string;
@@ -30,6 +32,36 @@ function renderBody(d: Draft) {
   return d.attachmentUrl ? d.body.split("{attachmentUrl}").join(d.attachmentUrl) : d.body;
 }
 
+function RichCopyButton({ text, signatureImage }: { text: string; signatureImage: string | null }) {
+  const [done, setDone] = useState(false);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      onClick={async () => {
+        try {
+          if (typeof ClipboardItem === "undefined") throw new Error("unsupported");
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/html": new Blob([buildEmailHtml(text, signatureImage)], { type: "text/html" }),
+              "text/plain": new Blob([text], { type: "text/plain" }),
+            }),
+          ]);
+          toast.success("已複製（含簽名圖片），請到 Outlook 新郵件內文按 Ctrl+V 貼上");
+        } catch {
+          await navigator.clipboard.writeText(text).catch(() => undefined);
+          toast.warning("此瀏覽器不支援複製圖片，已只複製文字；建議使用 Chrome 或 Edge");
+        }
+        setDone(true);
+        setTimeout(() => setDone(false), 1500);
+      }}
+    >
+      {done ? <Check /> : <ImageIcon />}
+      {signatureImage ? "複製內文（含簽名圖片）" : "複製內文（含格式）"}
+    </Button>
+  );
+}
+
 function mailto(d: Draft) {
   const split = (s: string) => s.split(/[,;，；\s]+/).filter(Boolean).join(",");
   const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(renderBody(d))}`];
@@ -42,11 +74,13 @@ export function EmailEditor({
   canEdit,
   schoolName,
   isAdmin = false,
+  signatureImage = null,
 }: {
   draft: Draft;
   canEdit: boolean;
   schoolName: string;
   isAdmin?: boolean;
+  signatureImage?: string | null;
 }) {
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -126,7 +160,8 @@ export function EmailEditor({
             )}
             <CopyButton text={d.toRecipients} label="複製收件人" />
             <CopyButton text={d.subject} label="複製主旨" />
-            <CopyButton text={() => renderBody(d)} label="複製內文" />
+            <RichCopyButton text={renderBody(d)} signatureImage={signatureImage} />
+            <CopyButton text={() => renderBody(d)} label="複製純文字" />
             <Button asChild variant="outline" size="sm">
               <a href={mailto(d)}>
                 <MailOpen />
@@ -164,7 +199,14 @@ export function EmailEditor({
               <span className="text-muted-foreground">附件：</span>
               {d.attachmentNames || "—"}
             </p>
-            <div className="mt-2 whitespace-pre-wrap break-all rounded-md border bg-white p-4 leading-relaxed">{renderBody(d)}</div>
+            <div className="mt-2 whitespace-pre-wrap break-all rounded-md border bg-white p-4 leading-relaxed">
+              {renderBody(d)}
+              {signatureImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={signatureImage} alt="簽名圖片" className="mt-2 block max-w-[480px]" style={{ maxWidth: "min(480px, 100%)" }} />
+              )}
+            </div>
+            {signatureImage && <p className="text-xs text-muted-foreground">「以郵件程式開啟」只能帶入文字；要含簽名圖片，請用「複製內文（含簽名圖片）」再貼到 Outlook。</p>}
           </CardContent>
         </Card>
         {canEdit && d.status === "DRAFT" && (

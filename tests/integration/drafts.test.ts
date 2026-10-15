@@ -154,4 +154,17 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     await deleteCase(admin, second.schoolCase.id);
     expect(await prisma.schoolCase.count()).toBe(0);
   });
+
+  it("簽名圖片：只接受圖片 data URL 並限制大小，可移除", async () => {
+    const { updateSignatureImage } = await import("@/server/users/user-service");
+    const u = await makeUser("pm@example.com");
+    const png = "data:image/png;base64," + Buffer.from("fake-png").toString("base64");
+    await updateSignatureImage(u, png);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).signatureImage).toBe(png);
+    await expect(updateSignatureImage(u, "data:text/html;base64,PHNjcmlwdD4=")).rejects.toThrow(/格式不支援/);
+    await expect(updateSignatureImage(u, "javascript:alert(1)")).rejects.toThrow(/格式不支援/);
+    await expect(updateSignatureImage(u, "data:image/png;base64," + "A".repeat(500_000))).rejects.toThrow(/太大/);
+    await updateSignatureImage(u, null);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).signatureImage).toBeNull();
+  });
 });

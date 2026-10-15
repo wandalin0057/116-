@@ -32,6 +32,8 @@ model User {
   passwordChangedAt DateTime? @db.Timestamptz
   // Email 草稿結尾的簽名檔（姓名、職稱、聯絡方式）
   emailSignature    String?
+  // 簽名檔圖片（data URL，已於瀏覽器端縮小，上限約 300KB）
+  signatureImage    String?
   createdAt         DateTime  @default(now()) @db.Timestamptz
   updatedAt         DateTime  @updatedAt @db.Timestamptz
 

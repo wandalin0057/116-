@@ -130,3 +130,17 @@ export async function updateEmailSignature(user: AuthUser, signature: string) {
   await prisma.user.update({ where: { id: user.id }, data: { emailSignature: value || null } });
   await writeAudit({ actorId: user.id, action: "USER_SIGNATURE_UPDATE", entityType: "User", entityId: user.id, summary: "更新 Email 簽名檔" });
 }
+
+const SIGNATURE_IMAGE_RE = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/;
+/** 簽名圖片上限（data URL 字元數，約 300KB 圖檔） */
+export const SIGNATURE_IMAGE_MAX_CHARS = 400_000;
+
+/** 設定或移除 Email 簽名圖片（null 表示移除） */
+export async function updateSignatureImage(user: AuthUser, dataUrl: string | null) {
+  if (dataUrl !== null) {
+    if (!SIGNATURE_IMAGE_RE.test(dataUrl)) throw new ValidationError("圖片格式不支援，請使用 PNG、JPG、GIF 或 WebP");
+    if (dataUrl.length > SIGNATURE_IMAGE_MAX_CHARS) throw new ValidationError("圖片太大，請使用較小的圖片（約 300KB 以內）");
+  }
+  await prisma.user.update({ where: { id: user.id }, data: { signatureImage: dataUrl } });
+  await writeAudit({ actorId: user.id, action: "USER_SIGNATURE_IMAGE", entityType: "User", entityId: user.id, summary: dataUrl ? "設定 Email 簽名圖片" : "移除 Email 簽名圖片" });
+}

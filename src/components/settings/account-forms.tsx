@@ -6,6 +6,7 @@ import {
   sendTestEmailAction,
   updateEmailSettingsAction,
   updateEmailSignatureAction,
+  updateSignatureImageAction,
   updateOrganizationAction,
   updateReminderPreferenceAction,
 } from "@/app/actions/settings";
@@ -201,5 +202,95 @@ export function OrganizationForm({ initial }: { initial: Org }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+const SIG_MAX_WIDTH = 480;
+const SIG_MAX_CHARS = 400_000;
+
+/** 讀取圖片並縮小（寬度上限 480px），回傳 data URL */
+async function shrinkImage(file: File): Promise<string> {
+  const src = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(new Error("讀取失敗"));
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("無法讀取這張圖片"));
+    i.src = src;
+  });
+  const scale = Math.min(1, SIG_MAX_WIDTH / img.naturalWidth);
+  const w = Math.max(1, Math.round(img.naturalWidth * scale));
+  const h = Math.max(1, Math.round(img.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const keepAlpha = file.type === "image/png" || file.type === "image/gif" || file.type === "image/webp";
+  if (!keepAlpha) {
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.drawImage(img, 0, 0, w, h);
+  let out = canvas.toDataURL(keepAlpha ? "image/png" : "image/jpeg", 0.9);
+  // 仍過大時改用 JPEG 並逐步降低品質
+  for (let q = 0.85; out.length > SIG_MAX_CHARS && q >= 0.4; q -= 0.15) {
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    out = canvas.toDataURL("image/jpeg", q);
+  }
+  return out;
+}
+
+export function SignatureImageForm({ initial }: { initial: string | null }) {
+  const [img, setImg] = useState<string | null>(initial);
+  const [err, setErr] = useState("");
+  const { run, pending } = useAction();
+  return (
+    <div className="max-w-lg space-y-3">
+      {img ? (
+        <div className="rounded-md border bg-white p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={img} alt="簽名圖片預覽" className="max-h-40 max-w-full" />
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">尚未設定簽名圖片。</p>
+      )}
+      <Input
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        aria-label="選擇簽名圖片"
+        onChange={async (e) => {
+          setErr("");
+          const f = e.target.files?.[0];
+          if (!f) return;
+          if (f.size > 10_000_000) return setErr("檔案超過 10MB，請換一張較小的圖片");
+          try {
+            const data = await shrinkImage(f);
+            if (data.length > SIG_MAX_CHARS) return setErr("圖片太大，請換一張較小的圖片");
+            setImg(data);
+          } catch (x) {
+            setErr(x instanceof Error ? x.message : "無法讀取圖片");
+          }
+        }}
+      />
+      {err && <p className="text-sm text-red-600">{err}</p>}
+      <p className="text-xs text-muted-foreground">建議使用公司 Logo 或名片圖檔（PNG／JPG）。過大的圖片會自動縮小為寬 480 像素。</p>
+      <div className="flex gap-2">
+        <Button disabled={pending || img === initial} onClick={() => run(() => updateSignatureImageAction(img))}>
+          {pending ? <Loader2 className="animate-spin" /> : <Save />}
+          儲存簽名圖片
+        </Button>
+        {initial && (
+          <Button variant="outline" disabled={pending} onClick={() => run(() => updateSignatureImageAction(null), { onSuccess: () => setImg(null) })}>
+            移除圖片
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
