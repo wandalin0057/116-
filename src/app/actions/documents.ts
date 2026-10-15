@@ -7,6 +7,7 @@ import { assertCaseAccess } from "@/server/auth/permissions";
 import {
   cancelDocument,
   createDocumentDraft,
+  deleteDocument,
   markDocumentDispatched,
   markDocumentDrafted,
   updateDocument,
@@ -46,6 +47,10 @@ export async function markDocumentDraftedAction(id: string) {
 
 export async function markDocumentDispatchedAction(id: string, input: { documentNumber: string; dispatchDate: string }) {
   return runAction(async () => markDocumentDispatched(await requireUserForAction(), id, input), "已標記發文完成並記錄發文字號");
+}
+
+export async function deleteDocumentAction(id: string) {
+  return runAction(async () => deleteDocument(await requireUserForAction(), id), "公文已刪除");
 }
 
 export async function cancelDocumentAction(id: string) {

@@ -20,6 +20,7 @@ import { formatROC, taipeiToday } from "@/lib/dates";
 import { buildDocumentLayout } from "@/server/documents/document-layout";
 import { splitBodyLines } from "@/server/documents/document-variables";
 import { renderTemplate } from "@/server/templates/template-renderer";
+import { DeleteDocumentButton } from "./delete-document-button";
 import { DocumentPreview } from "./document-preview";
 
 interface DocState {
@@ -47,12 +48,16 @@ export function DocumentEditor({
   template,
   baseVars,
   companyName,
+  schoolName,
+  isAdmin = false,
 }: {
   doc: DocState;
   canEdit: boolean;
   template: { subject: string; body: string };
   baseVars: Record<string, string>;
   companyName: string;
+  schoolName: string;
+  isAdmin?: boolean;
 }) {
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -301,6 +306,9 @@ export function DocumentEditor({
                 <Ban />
                 作廢
               </ActionButton>
+            )}
+            {canEdit && (d.status !== "DISPATCHED" || isAdmin) && (
+              <DeleteDocumentButton id={d.id} schoolName={schoolName} dispatched={d.status === "DISPATCHED"} redirectTo="/documents" size="sm" />
             )}
             {dirty && <p className="w-full text-xs text-amber-700">有未儲存的變更；匯出與標記前請先儲存。</p>}
           </CardContent>

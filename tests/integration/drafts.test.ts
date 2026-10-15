@@ -83,4 +83,26 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     const logs = await prisma.auditLog.findMany();
     expect(JSON.stringify(logs)).not.toContain("TopSecret77");
   });
+
+  it("刪除公文：未發文可由編輯者刪除；已發文僅管理員可刪除，並留下操作紀錄", async () => {
+    const { deleteDocument } = await import("@/server/documents/document-service");
+    const admin = await makeUser("admin@example.com", "ADMIN");
+    const u = await makeUser("pm@example.com");
+    const other = await makeUser("other@example.com");
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const draft = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "PRE_REPORT" });
+    await expect(deleteDocument(other, draft.id)).rejects.toThrow(/權限/);
+    await deleteDocument(u, draft.id);
+    expect(await prisma.officialDocument.count({ where: { id: draft.id } })).toBe(0);
+
+    const sent = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "REVIEW_DRAWING" });
+    await markDocumentDispatched(u, sent.id, { documentNumber: "交顧字第1150002號", dispatchDate: "2026-11-02" });
+    await expect(deleteDocument(u, sent.id)).rejects.toThrow(/僅管理員/);
+    await deleteDocument(admin, sent.id);
+    expect(await prisma.officialDocument.count({ where: { id: sent.id } })).toBe(0);
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { action: "DOCUMENT_DELETE", entityId: sent.id } });
+    expect(log.summary).toContain("交顧字第1150002號");
+    // 對應工作的完成狀態不受影響
+    expect((await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "REVIEW_DRAWING_DISPATCH" } })).status).toBe("COMPLETED");
+  });
 });

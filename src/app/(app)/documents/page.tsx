@@ -8,6 +8,8 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { requireUser } from "@/lib/auth";
 import { dbDateToISOOrNull, formatROCDateTime, formatROCShort } from "@/lib/dates";
 import { listDocuments } from "@/server/documents/document-service";
+import { DeleteDocumentButton } from "@/components/documents/delete-document-button";
+import { isAdmin } from "@/server/auth/types";
 import { DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS } from "@/server/documents/document-variables";
 
 export const metadata = { title: "公文管理" };
@@ -15,6 +17,7 @@ type SP = Record<string, string | undefined>;
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
+  const admin = isAdmin(user);
   const sp = await searchParams;
   const result = await listDocuments(user, { q: sp.q, status: sp.status, documentType: sp.type, sort: sp.sort, dir: sp.dir === "asc" ? "asc" : "desc", page: Number(sp.page) || 1 });
   const sortProps = { pathname: "/documents", params: sp, defaultSort: "createdAt" };
@@ -54,6 +57,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                   <TH>
                     <SortHeader label="建立時間" field="createdAt" {...sortProps} />
                   </TH>
+                  <TH>操作</TH>
                 </TR>
               </THead>
               <TBody>
@@ -74,6 +78,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                     <TD className="whitespace-nowrap">{d.documentNumber ?? "—"}</TD>
                     <TD className="whitespace-nowrap tabular">{formatROCShort(dbDateToISOOrNull(d.dispatchDate))}</TD>
                     <TD className="whitespace-nowrap text-xs tabular">{formatROCDateTime(d.createdAt)}</TD>
+                    <TD>
+                      {(d.status !== "DISPATCHED" || admin) && (
+                        <DeleteDocumentButton id={d.id} schoolName={d.schoolCase.schoolName} dispatched={d.status === "DISPATCHED"} />
+                      )}
+                    </TD>
                   </TR>
                 ))}
               </TBody>

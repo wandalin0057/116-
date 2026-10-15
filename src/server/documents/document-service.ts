@@ -6,7 +6,8 @@ import { dbDateToISOOrNull, isISODate, isoToDbDate, taipeiToday } from "@/lib/da
 import { writeAudit } from "@/server/audit/audit";
 import { assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
 import type { AuthUser } from "@/server/auth/types";
-import { NotFoundError, ValidationError } from "@/server/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/server/errors";
+import { isAdmin } from "@/server/auth/types";
 import { orderBy } from "@/server/query-utils";
 import { renderTemplate } from "@/server/templates/template-renderer";
 import { getActiveTemplate } from "@/server/templates/template-service";
@@ -170,6 +171,26 @@ export async function cancelDocument(user: AuthUser, id: string) {
   if (doc.status === "DISPATCHED") throw new ValidationError("已發文之公文不可作廢");
   await prisma.officialDocument.update({ where: { id }, data: { status: "CANCELLED" } });
   await writeAudit({ actorId: user.id, action: "DOCUMENT_CANCEL", entityType: "OfficialDocument", entityId: id, summary: "公文草稿作廢" });
+}
+
+/**
+ * 永久刪除公文。已發文之公文屬正式紀錄，僅管理員可刪除。
+ * 刪除不會改變對應工作的完成狀態；操作紀錄保留主旨與發文字號。
+ */
+export async function deleteDocument(user: AuthUser, id: string) {
+  const doc = await prisma.officialDocument.findUnique({ where: { id }, include: { schoolCase: { select: { schoolName: true } } } });
+  if (!doc) throw new NotFoundError("找不到公文");
+  await assertCaseAccess(user, doc.caseId, "edit");
+  if (doc.status === "DISPATCHED" && !isAdmin(user)) throw new ForbiddenError("已發文之公文僅管理員可刪除");
+  await prisma.officialDocument.delete({ where: { id } });
+  await writeAudit({
+    actorId: user.id,
+    action: "DOCUMENT_DELETE",
+    entityType: "OfficialDocument",
+    entityId: id,
+    summary: `刪除公文：${doc.schoolCase.schoolName}（${doc.status === "DISPATCHED" ? `已發文，字號 ${doc.documentNumber ?? "—"}` : "未發文"}）`,
+    changes: { documentType: doc.documentType, status: doc.status, subject: doc.subject, documentNumber: doc.documentNumber },
+  });
 }
 
 export async function getDocumentForEdit(user: AuthUser, id: string) {

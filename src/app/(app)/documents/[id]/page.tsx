@@ -41,6 +41,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       <DocumentEditor
         canEdit={canEdit}
         companyName={process.env.COMPANY_NAME ?? "○○交通工程顧問有限公司"}
+        schoolName={doc.schoolCase.schoolName}
+        isAdmin={user.role === "ADMIN"}
         template={{ subject: template.subject, body: template.body }}
         baseVars={baseVars as Record<string, string>}
         doc={{
