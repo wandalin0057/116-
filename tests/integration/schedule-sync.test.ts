@@ -124,4 +124,24 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     await expect(createCase(u, caseInput({}))).rejects.toThrow(/負責人 Email/);
     await expect(createCase(u, caseInput({ responsibleName: "我", responsibleEmail: "user@example.com" }))).resolves.toBeTruthy();
   });
+
+  it("計畫分類：可依計畫名稱篩選案件、待辦與儀表板", async () => {
+    const { listCases } = await import("@/server/cases/case-service");
+    const { listTasks } = await import("@/server/tasks/task-service");
+    const { getDashboard } = await import("@/server/dashboard/dashboard-service");
+    const { countCasesByProject, listProjectNames } = await import("@/server/cases/projects");
+    const admin = await makeUser("pm@example.com", "ADMIN");
+    const P115 = "115年度臺北市通學區規劃分析案";
+    const P116 = "116年度臺北市通學區規劃分析案";
+    await createCase(admin, caseInput({ responsibleUserId: admin.id, projectCode: "A115", projectName: P115, schoolName: "甲國小" }));
+    await createCase(admin, caseInput({ responsibleUserId: admin.id, projectCode: "B116", projectName: P116, schoolName: "乙國小" }));
+    await createCase(admin, caseInput({ responsibleUserId: admin.id, projectCode: "C116", projectName: P116, schoolName: "丙國小" }));
+    expect((await listProjectNames(admin)).slice(0, 2)).toEqual([P116, P115]);
+    expect((await countCasesByProject(admin)).get(P116)).toBe(2);
+    expect((await listCases(admin, { projectName: P116 })).items.map((c) => c.schoolName).sort()).toEqual(["丙國小", "乙國小"]);
+    const tasks = await listTasks(admin, { view: "all", projectName: P115, pageSize: 200 });
+    expect(new Set(tasks.items.map((t) => t.schoolCase.schoolName))).toEqual(new Set(["甲國小"]));
+    const dash = await getDashboard(admin, { projectName: P116, now: new Date("2026-10-15T01:00:00Z") });
+    expect(dash.progress.map((p) => p.schoolName).sort()).toEqual(["丙國小", "乙國小"]);
+  });
 });

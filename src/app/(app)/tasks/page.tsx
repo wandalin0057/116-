@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { TASK_COLORS, TASK_STATUS_LABELS, TASK_TYPE_LABELS } from "@/server/schedule/task-types";
 import { listTasks } from "@/server/tasks/task-service";
 import { listUsers } from "@/server/users/user-service";
+import { listProjectNames } from "@/server/cases/projects";
 
 export const metadata = { title: "工作待辦" };
 
@@ -26,12 +27,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const user = await requireUser();
   const sp = await searchParams;
   const view = (VIEWS.find((v) => v.value === sp.view)?.value ?? "open") as (typeof VIEWS)[number]["value"];
-  const [result, users] = await Promise.all([
+  const [result, users, projects] = await Promise.all([
     listTasks(user, {
       view,
       q: sp.q,
       status: sp.status,
       taskType: sp.taskType,
+      projectName: sp.project,
       category: sp.category,
       assignedUserId: sp.assignee,
       dueFrom: sp.from,
@@ -42,6 +44,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       pageSize: 30,
     }),
     listUsers(),
+    listProjectNames(user),
   ]);
   const sortProps = { pathname: "/tasks", params: sp, defaultSort: "dueDate" };
 
@@ -60,6 +63,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <ListControls
             searchPlaceholder="搜尋學校、案件編號、工作…"
             filters={[
+              { name: "project", label: "計畫", allLabel: "全部計畫", options: projects.map((p) => ({ value: p, label: p })) },
               { name: "category", label: "分類", options: Object.entries(TASK_COLORS).map(([value, c]) => ({ value, label: c.label })) },
               { name: "taskType", label: "工作類型", options: Object.entries(TASK_TYPE_LABELS).map(([value, label]) => ({ value, label })) },
               { name: "status", label: "狀態", options: Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({ value, label })) },

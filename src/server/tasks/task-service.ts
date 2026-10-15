@@ -40,6 +40,7 @@ export interface TaskListQuery {
   taskType?: string;
   category?: string;
   caseId?: string;
+  projectName?: string;
   assignedUserId?: string;
   dueFrom?: string;
   dueTo?: string;
@@ -65,6 +66,7 @@ export async function listTasks(user: AuthUser, query: TaskListQuery) {
     if (types.length) filters.push({ taskType: { in: types } });
   }
   if (query.caseId) filters.push({ caseId: query.caseId });
+  if (query.projectName) filters.push({ schoolCase: { projectName: query.projectName } });
   if (query.assignedUserId) filters.push({ assignedUserId: query.assignedUserId === "none" ? null : query.assignedUserId });
   if ((query.dueFrom && isISODate(query.dueFrom)) || (query.dueTo && isISODate(query.dueTo))) {
     filters.push(dueDateRangeWhere(isISODate(query.dueFrom ?? "") ? query.dueFrom : null, isISODate(query.dueTo ?? "") ? query.dueTo : null));

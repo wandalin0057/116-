@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { canAccessCase } from "@/server/auth/permissions";
 import { listUsers } from "@/server/users/user-service";
+import { listProjectNames } from "@/server/cases/projects";
 
 export const metadata = { title: "編輯學校案件" };
 
@@ -16,7 +17,7 @@ export default async function EditCasePage({ params }: { params: Promise<{ id: s
   const [c, users, names] = await Promise.all([
     prisma.schoolCase.findUniqueOrThrow({ where: { id }, include: { responsibleUser: { select: { name: true, email: true } } } }),
     listUsers(),
-    prisma.schoolCase.findMany({ distinct: ["projectName"], select: { projectName: true } }),
+    listProjectNames(),
   ]);
   return (
     <>
@@ -27,7 +28,7 @@ export default async function EditCasePage({ params }: { params: Promise<{ id: s
         initial={caseToFormValues(c, { responsible: c.responsibleUser })}
         users={users.map((u) => ({ id: u.id, name: u.name, email: u.email }))}
         canCreateResponsible={user.role === "ADMIN"}
-        projectNames={names.map((n) => n.projectName)}
+        projectNames={names}
       />
     </>
   );

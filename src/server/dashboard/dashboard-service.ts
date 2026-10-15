@@ -11,7 +11,7 @@ import { computeDueInfo, type DueInfo } from "@/server/tasks/task-utils";
 export type DashboardTask = Prisma.TaskGetPayload<{ include: typeof TASK_INCLUDE }> & { due: DueInfo; category: TaskCategory };
 
 /** 儀表板統計：全部由資料庫即時計算 */
-export async function getDashboard(user: AuthUser, opts: { mineOnly?: boolean; now?: Date } = {}) {
+export async function getDashboard(user: AuthUser, opts: { mineOnly?: boolean; now?: Date; projectName?: string } = {}) {
   const today = taipeiToday(opts.now);
   const tomorrow = addCalendarDays(today, 1);
   const in7 = addCalendarDays(today, 7);
@@ -21,7 +21,10 @@ export async function getDashboard(user: AuthUser, opts: { mineOnly?: boolean; n
   const scope: Prisma.TaskWhereInput[] = [taskAccessWhere(user), OPEN_WHERE, { schoolCase: { status: { in: ["ACTIVE", "ON_HOLD"] } } }];
   if (opts.mineOnly) scope.push({ OR: [{ assignedUserId: user.id }, { assignedUserId: null, schoolCase: { responsibleUserId: user.id } }] });
 
+  if (opts.projectName) scope.push({ schoolCase: { projectName: opts.projectName } });
+
   const caseScope: Prisma.SchoolCaseWhereInput[] = [caseAccessWhere(user)];
+  if (opts.projectName) caseScope.push({ projectName: opts.projectName });
   if (opts.mineOnly) caseScope.push({ OR: [{ responsibleUserId: user.id }, { members: { some: { userId: user.id } } }] });
 
   const weekFrom = parseTaipeiDateTime(`${weekStart}T00:00`);

@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const today = taipeiToday();
   const { events } = await getCalendarEvents(user, addCalendarDays(today, -30), addCalendarDays(today, 365), {
     caseId: sp.get("caseId") ?? undefined,
+    projectName: sp.get("project") ?? undefined,
     assignedUserId: sp.get("assignee") ?? undefined,
     taskType: sp.get("taskType") ?? undefined,
   });

@@ -2,17 +2,18 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { ListControls } from "@/components/common/list-controls";
 import { EmptyState, PageHeader } from "@/components/common/page-header";
-import { Pagination, SortHeader } from "@/components/common/table-nav";
+import { buildHref, Pagination, SortHeader } from "@/components/common/table-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { dbDateToISOOrNull, formatROCDateTime, formatROCShort } from "@/lib/dates";
 import { CASE_STATUS_LABELS, TAIPEI_DISTRICTS } from "@/server/cases/case-schema";
 import { listCases } from "@/server/cases/case-service";
 import { listUsers } from "@/server/users/user-service";
+import { countCasesByProject, listProjectNames, shortProjectLabel } from "@/server/cases/projects";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "學校案件" };
 
@@ -21,7 +22,7 @@ type SP = Record<string, string | undefined>;
 export default async function CasesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
   const sp = await searchParams;
-  const [result, users, projectNames] = await Promise.all([
+  const [result, users, projectNames, projectCounts] = await Promise.all([
     listCases(user, {
       q: sp.q,
       status: sp.status,
@@ -33,8 +34,23 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
       page: Number(sp.page) || 1,
     }),
     listUsers(),
-    prisma.schoolCase.findMany({ distinct: ["projectName"], select: { projectName: true } }),
+    listProjectNames(user),
+    countCasesByProject(user),
   ]);
+  const totalCases = [...projectCounts.values()].reduce((a, b) => a + b, 0);
+  const tab = (label: string, value: string | null, count: number) => (
+    <Link
+      key={value ?? "all"}
+      href={buildHref("/cases", sp, { projectName: value, page: null })}
+      className={cn(
+        "whitespace-nowrap rounded-md px-3 py-1.5 text-sm",
+        (sp.projectName ?? null) === value ? "bg-primary font-medium text-white" : "text-slate-600 hover:bg-accent",
+      )}
+    >
+      {label}
+      <span className="ml-1 text-xs opacity-80">（{count}）</span>
+    </Link>
+  );
   const sortProps = { pathname: "/cases", params: sp, defaultSort: "projectCode" };
 
   return (
@@ -44,13 +60,18 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         description="每所學校一筆案件；點選案件可查看期程、公文與 Email 草稿。"
         actions={
           <Button asChild>
-            <Link href="/cases/new">
+            <Link href={sp.projectName ? `/cases/new?project=${encodeURIComponent(sp.projectName)}` : "/cases/new"}>
               <Plus />
               新增案件
             </Link>
           </Button>
         }
       />
+      <div className="mb-3 flex gap-1 overflow-x-auto rounded-lg border bg-white p-1">
+        {tab("全部計畫", null, totalCases)}
+        {projectNames.map((n) => tab(shortProjectLabel(n), n, projectCounts.get(n) ?? 0))}
+      </div>
+      {sp.projectName && <p className="mb-2 text-sm font-medium text-slate-700">{sp.projectName}</p>}
       <Card>
         <div className="border-b p-3">
           <ListControls
@@ -58,7 +79,6 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
             filters={[
               { name: "status", label: "狀態", options: Object.entries(CASE_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
               { name: "district", label: "行政區", options: TAIPEI_DISTRICTS.map((d) => ({ value: d, label: d })) },
-              { name: "projectName", label: "計畫", options: projectNames.map((p) => ({ value: p.projectName, label: p.projectName })) },
               { name: "responsible", label: "負責人", options: users.map((u) => ({ value: u.id, label: u.name })) },
             ]}
           />

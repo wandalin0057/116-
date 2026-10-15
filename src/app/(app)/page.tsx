@@ -1,6 +1,9 @@
 import { AlertTriangle, CalendarClock, CalendarDays, Clock, FilePen, FileText, Mail, MapPin, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, EmptyState } from "@/components/common/page-header";
+import { ListControls } from "@/components/common/list-controls";
+import { buildHref } from "@/components/common/table-nav";
+import { listProjectNames } from "@/server/cases/projects";
 import { TaskCard, toTaskCard } from "@/components/tasks/task-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,11 +40,11 @@ function TaskList({ tasks, empty }: { tasks: DashboardTask[]; empty: string }) {
   );
 }
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ mine?: string; error?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ mine?: string; error?: string; project?: string }> }) {
   const user = await requireUser();
   const sp = await searchParams;
   const mineOnly = sp.mine === "1";
-  const d = await getDashboard(user, { mineOnly });
+  const [d, projects] = await Promise.all([getDashboard(user, { mineOnly, projectName: sp.project || undefined }), listProjectNames(user)]);
 
   return (
     <>
@@ -49,13 +52,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         title="儀表板"
         description={`今天是 ${formatROC(d.today)}（星期${weekdayZh(d.today)}）　本週 ${formatROCShort(d.weekStart, false)}–${formatROCShort(d.weekEnd, false)}`}
         actions={
-          <div className="inline-flex rounded-md border bg-white p-0.5 text-sm">
-            <Link href="/" className={cn("rounded px-3 py-1", !mineOnly && "bg-primary text-white")}>
-              {user.role === "ADMIN" ? "全部案件" : "所有可存取案件"}
-            </Link>
-            <Link href="/?mine=1" className={cn("rounded px-3 py-1", mineOnly && "bg-primary text-white")}>
-              我負責的
-            </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <ListControls
+              showSearch={false}
+              filters={[{ name: "project", label: "計畫", allLabel: "全部計畫", options: projects.map((p) => ({ value: p, label: p })) }]}
+            />
+            <div className="inline-flex rounded-md border bg-white p-0.5 text-sm">
+              <Link href={buildHref("/", sp, { mine: null, error: null })} className={cn("rounded px-3 py-1", !mineOnly && "bg-primary text-white")}>
+                {user.role === "ADMIN" ? "全部案件" : "所有可存取案件"}
+              </Link>
+              <Link href={buildHref("/", sp, { mine: "1", error: null })} className={cn("rounded px-3 py-1", mineOnly && "bg-primary text-white")}>
+                我負責的
+              </Link>
+            </div>
           </div>
         }
       />

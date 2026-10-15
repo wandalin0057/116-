@@ -26,6 +26,7 @@ import { caseAccessWhere } from "@/server/auth/permissions";
 import { getCalendarEvents, type CalendarEvent } from "@/server/calendar/calendar-view-service";
 import { TASK_COLORS, TASK_TYPE_LABELS } from "@/server/schedule/task-types";
 import { listUsers } from "@/server/users/user-service";
+import { listProjectNames } from "@/server/cases/projects";
 
 export const metadata = { title: "行事曆" };
 type SP = Record<string, string | undefined>;
@@ -80,16 +81,21 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     next = addCalendarDays(anchor, 60);
   }
 
-  const filter = { caseId: sp.caseId, assignedUserId: sp.assignee, taskType: sp.taskType, includeCompleted: true };
-  const [{ events, days, hasEstimated }, users, cases] = await Promise.all([
+  const filter = { caseId: sp.caseId, projectName: sp.project, assignedUserId: sp.assignee, taskType: sp.taskType, includeCompleted: true };
+  const [{ events, days, hasEstimated }, users, cases, projects] = await Promise.all([
     getCalendarEvents(user, from, to, filter),
     listUsers(),
-    prisma.schoolCase.findMany({ where: caseAccessWhere(user), select: { id: true, schoolName: true }, orderBy: { schoolName: "asc" } }),
+    prisma.schoolCase.findMany({
+      where: { AND: [caseAccessWhere(user), sp.project ? { projectName: sp.project } : {}] },
+      select: { id: true, schoolName: true },
+      orderBy: { schoolName: "asc" },
+    }),
+    listProjectNames(user),
   ]);
   const byDate = new Map<string, CalendarEvent[]>();
   for (const e of events) byDate.set(e.date, [...(byDate.get(e.date) ?? []), e]);
   const dayInfo = new Map(days.map((d) => [d.date, d]));
-  const icsParams = new URLSearchParams(Object.entries({ caseId: sp.caseId, assignee: sp.assignee, taskType: sp.taskType }).filter(([, v]) => v) as [string, string][]);
+  const icsParams = new URLSearchParams(Object.entries({ caseId: sp.caseId, project: sp.project, assignee: sp.assignee, taskType: sp.taskType }).filter(([, v]) => v) as [string, string][]);
   const currentMonth = parseISODate(anchor).month;
 
   const viewLink = (v: string, label: string, Icon: React.ElementType) => (
@@ -141,6 +147,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <ListControls
             showSearch={false}
             filters={[
+              { name: "project", label: "計畫", allLabel: "全部計畫", options: projects.map((p) => ({ value: p, label: p })) },
               { name: "caseId", label: "學校", options: cases.map((c) => ({ value: c.id, label: c.schoolName })) },
               { name: "assignee", label: "承辦人", options: users.map((u) => ({ value: u.id, label: u.name })) },
               { name: "taskType", label: "工作類型", options: Object.entries(TASK_TYPE_LABELS).map(([value, label]) => ({ value, label })) },

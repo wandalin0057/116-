@@ -27,6 +27,7 @@ export interface CalendarEvent {
 
 export interface CalendarFilter {
   caseId?: string;
+  projectName?: string;
   assignedUserId?: string;
   taskType?: string;
   includeCompleted?: boolean;
@@ -37,6 +38,7 @@ export async function getCalendarEvents(user: AuthUser, from: ISODate, to: ISODa
   const where: Prisma.TaskWhereInput[] = [taskAccessWhere(user), dueDateRangeWhere(from, to)];
   if (!filter.includeCompleted) where.push({ status: { not: "CANCELLED" } });
   if (filter.caseId) where.push({ caseId: filter.caseId });
+  if (filter.projectName) where.push({ schoolCase: { projectName: filter.projectName } });
   if (filter.assignedUserId) where.push({ assignedUserId: filter.assignedUserId });
   if (filter.taskType && filter.taskType in TASK_CATEGORY) where.push({ taskType: filter.taskType as TaskType });
   const [tasks, bds] = await Promise.all([

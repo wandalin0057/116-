@@ -15,6 +15,8 @@ import type { CaseInput } from "@/server/cases/case-schema";
 import { CASE_STATUS_LABELS, TAIPEI_DISTRICTS } from "@/server/cases/case-schema";
 import type { ScheduleChange } from "@/server/schedule/schedule-calculator";
 
+const OTHER_PROJECT = "__other__";
+
 type FormValues = Required<{ [K in keyof CaseInput]: string }>;
 
 function Field({ label, name, error, children, hint, required }: { label: string; name: string; error?: string; children: React.ReactNode; hint?: string; required?: boolean }) {
@@ -51,6 +53,8 @@ export function CaseForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<ScheduleChange[] | null>(null);
   const { run, pending } = useAction();
+  const projectOptions = projectNames.includes(initial.projectName) || !initial.projectName ? projectNames : [initial.projectName, ...projectNames];
+  const [customProject, setCustomProject] = useState(false);
   const emailTrim = v.responsibleEmail.trim().toLowerCase();
   const responsibleMatch = users.find((u) => u.email.toLowerCase() === emailTrim);
   const responsibleIsNew = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrim) && !responsibleMatch;
@@ -109,13 +113,38 @@ export function CaseForm({
           <Field label="案件編號" name="projectCode" error={errors.projectCode} required hint="不可重複，例如 TP115-001">
             <Input id="projectCode" value={v.projectCode} onChange={set("projectCode")} required />
           </Field>
-          <Field label="計畫名稱" name="projectName" error={errors.projectName} required>
-            <Input id="projectName" list="project-names" value={v.projectName} onChange={set("projectName")} required />
-            <datalist id="project-names">
-              {projectNames.map((n) => (
-                <option key={n} value={n} />
+          <Field label="計畫名稱" name="projectName" error={errors.projectName} required hint={customProject ? "輸入新的計畫名稱，儲存後會自動加入計畫清單" : undefined}>
+            <Select
+              id="projectName"
+              value={customProject ? OTHER_PROJECT : v.projectName}
+              onChange={(e) => {
+                if (e.target.value === OTHER_PROJECT) {
+                  setCustomProject(true);
+                  setV((s) => ({ ...s, projectName: "" }));
+                } else {
+                  setCustomProject(false);
+                  setV((s) => ({ ...s, projectName: e.target.value }));
+                }
+              }}
+            >
+              {projectOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
               ))}
-            </datalist>
+              <option value={OTHER_PROJECT}>＋ 其他計畫（自行輸入）</option>
+            </Select>
+            {customProject && (
+              <Input
+                id="projectNameCustom"
+                className="mt-2"
+                value={v.projectName}
+                onChange={set("projectName")}
+                placeholder="例如：117年度臺北市通學區規劃分析案"
+                autoFocus
+                required
+              />
+            )}
           </Field>
           <Field label="學校名稱" name="schoolName" error={errors.schoolName} required>
             <Input id="schoolName" value={v.schoolName} onChange={set("schoolName")} required />
