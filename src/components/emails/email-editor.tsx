@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DeleteEmailDraftButton } from "./delete-email-draft-button";
 
 interface Draft {
   id: string;
@@ -30,7 +31,17 @@ function mailto(d: Draft) {
   return `mailto:${split(d.toRecipients)}?${q.join("&")}`;
 }
 
-export function EmailEditor({ draft: initial, canEdit }: { draft: Draft; canEdit: boolean }) {
+export function EmailEditor({
+  draft: initial,
+  canEdit,
+  schoolName,
+  isAdmin = false,
+}: {
+  draft: Draft;
+  canEdit: boolean;
+  schoolName: string;
+  isAdmin?: boolean;
+}) {
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -106,6 +117,9 @@ export function EmailEditor({ draft: initial, canEdit }: { draft: Draft; canEdit
                 以郵件程式開啟
               </a>
             </Button>
+            {canEdit && (d.status !== "CONFIRMED_SENT" || isAdmin) && (
+              <DeleteEmailDraftButton id={d.id} schoolName={schoolName} sent={d.status === "CONFIRMED_SENT"} redirectTo="/emails" size="sm" />
+            )}
           </div>
         </CardContent>
       </Card>

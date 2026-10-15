@@ -105,4 +105,24 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     // 對應工作的完成狀態不受影響
     expect((await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "REVIEW_DRAWING_DISPATCH" } })).status).toBe("COMPLETED");
   });
+
+  it("刪除 Email 草稿：未寄出可由編輯者刪除；已確認寄出僅管理員可刪除，並留下操作紀錄", async () => {
+    const { deleteEmailDraft } = await import("@/server/emails/email-draft-service");
+    const admin = await makeUser("admin@example.com", "ADMIN");
+    const u = await makeUser("pm@example.com");
+    const other = await makeUser("other@example.com");
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const d1 = await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_SLIDES_EMAIL" });
+    await expect(deleteEmailDraft(other, d1.id)).rejects.toThrow(/權限/);
+    await deleteEmailDraft(u, d1.id);
+    expect(await prisma.emailDraft.count({ where: { id: d1.id } })).toBe(0);
+
+    const d2 = await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_MINUTES_EMAIL" });
+    await confirmEmailSent(u, d2.id, { confirmed: true });
+    await expect(deleteEmailDraft(u, d2.id)).rejects.toThrow(/僅管理員/);
+    await deleteEmailDraft(admin, d2.id);
+    expect(await prisma.emailDraft.count({ where: { id: d2.id } })).toBe(0);
+    expect(await prisma.auditLog.count({ where: { action: "EMAIL_DRAFT_DELETE" } })).toBe(2);
+    expect((await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "REVIEW_MINUTES_EMAIL" } })).status).toBe("COMPLETED");
+  });
 });

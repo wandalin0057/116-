@@ -37,6 +37,8 @@ export default async function EmailPage({ params }: { params: Promise<{ id: stri
       />
       <EmailEditor
         canEdit={canEdit}
+        schoolName={draft.schoolCase.schoolName}
+        isAdmin={user.role === "ADMIN"}
         draft={{
           id: draft.id,
           status: draft.status,

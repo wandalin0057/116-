@@ -8,6 +8,8 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { requireUser } from "@/lib/auth";
 import { formatROCDateTime } from "@/lib/dates";
 import { EMAIL_DRAFT_STATUS_LABELS, listEmailDrafts } from "@/server/emails/email-draft-service";
+import { DeleteEmailDraftButton } from "@/components/emails/delete-email-draft-button";
+import { isAdmin } from "@/server/auth/types";
 import { EMAIL_TEMPLATE_TYPES, TEMPLATE_TYPE_LABELS } from "@/server/templates/default-templates";
 
 export const metadata = { title: "Email 草稿" };
@@ -15,6 +17,7 @@ type SP = Record<string, string | undefined>;
 
 export default async function EmailsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
+  const admin = isAdmin(user);
   const sp = await searchParams;
   const result = await listEmailDrafts(user, { q: sp.q, status: sp.status, templateType: sp.type, sort: sp.sort, dir: sp.dir === "asc" ? "asc" : "desc", page: Number(sp.page) || 1 });
   const sortProps = { pathname: "/emails", params: sp, defaultSort: "createdAt" };
@@ -49,6 +52,7 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
                   <TH>
                     <SortHeader label="確認寄出" field="confirmedSentAt" {...sortProps} />
                   </TH>
+                  <TH>操作</TH>
                 </TR>
               </THead>
               <TBody>
@@ -67,6 +71,11 @@ export default async function EmailsPage({ searchParams }: { searchParams: Promi
                     </TD>
                     <TD className="whitespace-nowrap text-xs tabular">{formatROCDateTime(e.createdAt)}</TD>
                     <TD className="whitespace-nowrap text-xs tabular">{formatROCDateTime(e.confirmedSentAt)}</TD>
+                    <TD>
+                      {(e.status !== "CONFIRMED_SENT" || admin) && (
+                        <DeleteEmailDraftButton id={e.id} schoolName={e.schoolCase.schoolName} sent={e.status === "CONFIRMED_SENT"} />
+                      )}
+                    </TD>
                   </TR>
                 ))}
               </TBody>

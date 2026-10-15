@@ -8,6 +8,7 @@ import {
   cancelEmailDraft,
   confirmEmailSent,
   createEmailDraft,
+  deleteEmailDraft,
   updateEmailDraft,
   type emailDraftUpdateSchema,
   type EmailTemplateType,
@@ -35,6 +36,10 @@ export async function updateEmailDraftAction(id: string, input: z.input<typeof e
 
 export async function confirmEmailSentAction(id: string) {
   return runAction(async () => confirmEmailSent(await requireUserForAction(), id, { confirmed: true }), "已標記為已寄出，對應工作已完成");
+}
+
+export async function deleteEmailDraftAction(id: string) {
+  return runAction(async () => deleteEmailDraft(await requireUserForAction(), id), "Email 草稿已刪除");
 }
 
 export async function cancelEmailDraftAction(id: string) {

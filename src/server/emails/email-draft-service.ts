@@ -6,7 +6,8 @@ import { writeAudit } from "@/server/audit/audit";
 import { assertCaseAccess, caseAccessWhere } from "@/server/auth/permissions";
 import type { AuthUser } from "@/server/auth/types";
 import { buildEmailVariables } from "@/server/documents/document-variables";
-import { NotFoundError, ValidationError } from "@/server/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/server/errors";
+import { isAdmin } from "@/server/auth/types";
 import { orderBy } from "@/server/query-utils";
 import { renderTemplate } from "@/server/templates/template-renderer";
 import { getActiveTemplate } from "@/server/templates/template-service";
@@ -150,6 +151,26 @@ export async function cancelEmailDraft(user: AuthUser, id: string) {
   if (draft.status === "CONFIRMED_SENT") throw new ValidationError("已確認寄出之草稿不可作廢");
   await prisma.emailDraft.update({ where: { id }, data: { status: "CANCELLED" } });
   await writeAudit({ actorId: user.id, action: "EMAIL_DRAFT_CANCEL", entityType: "EmailDraft", entityId: id, summary: "Email 草稿作廢" });
+}
+
+/**
+ * 永久刪除 Email 草稿。已確認寄出者屬工作紀錄，僅管理員可刪除。
+ * 刪除不會改變對應工作的完成狀態；操作紀錄保留主旨與收件人。
+ */
+export async function deleteEmailDraft(user: AuthUser, id: string) {
+  const draft = await prisma.emailDraft.findUnique({ where: { id }, include: { schoolCase: { select: { schoolName: true } } } });
+  if (!draft) throw new NotFoundError("找不到 Email 草稿");
+  await assertCaseAccess(user, draft.caseId, "edit");
+  if (draft.status === "CONFIRMED_SENT" && !isAdmin(user)) throw new ForbiddenError("已確認寄出之 Email 僅管理員可刪除");
+  await prisma.emailDraft.delete({ where: { id } });
+  await writeAudit({
+    actorId: user.id,
+    action: "EMAIL_DRAFT_DELETE",
+    entityType: "EmailDraft",
+    entityId: id,
+    summary: `刪除 Email 草稿：${draft.schoolCase.schoolName}（${EMAIL_DRAFT_STATUS_LABELS[draft.status]}）`,
+    changes: { templateType: draft.templateType, status: draft.status, subject: draft.subject, toRecipients: draft.toRecipients },
+  });
 }
 
 export async function getEmailDraft(user: AuthUser, id: string) {
