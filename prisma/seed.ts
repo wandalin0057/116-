@@ -18,10 +18,38 @@ import { hashPassword, validatePasswordStrength } from "../src/server/auth/passw
 const prisma = new PrismaClient();
 
 async function seedRules() {
+  const added: string[] = [];
   for (const r of DEFAULT_DEADLINE_RULES) {
-    await prisma.deadlineRule.upsert({ where: { taskType: r.taskType }, create: r, update: {} });
+    const exists = await prisma.deadlineRule.findUnique({ where: { taskType: r.taskType }, select: { id: true } });
+    if (!exists) {
+      await prisma.deadlineRule.create({ data: r });
+      added.push(r.taskType);
+    }
   }
-  console.log(`✓ 期限規則 ${DEFAULT_DEADLINE_RULES.length} 筆`);
+  console.log(`✓ 期限規則 ${DEFAULT_DEADLINE_RULES.length} 筆${added.length ? `（新增 ${added.join("、")}）` : ""}`);
+  if (added.length) await backfillNewTasks();
+}
+
+/** 新增期限規則後，為既有案件補建對應工作；後續步驟已完成者，新工作一併標記完成（避免既往案件產生逾期提醒） */
+async function backfillNewTasks() {
+  const { syncCaseTasks } = await import("../src/server/schedule/task-sync");
+  const cases = await prisma.schoolCase.findMany({ where: { status: { in: ["ACTIVE", "ON_HOLD"] } }, select: { id: true } });
+  for (const c of cases) {
+    await syncCaseTasks(c.id, { actorId: null, source: "RULE_CHANGE", reason: "新增期限規則，補建工作" });
+  }
+  const laterDone = await prisma.task.findMany({
+    where: { taskType: { in: ["PRE_REPORT_DRAFT", "PRE_REPORT_DISPATCH"] }, status: "COMPLETED" },
+    select: { caseId: true, actualCompletedAt: true },
+  });
+  let done = 0;
+  for (const t of laterDone) {
+    const r = await prisma.task.updateMany({
+      where: { caseId: t.caseId, taskType: "PRE_REPORT_PROVIDE", status: { in: ["NOT_STARTED", "IN_PROGRESS"] } },
+      data: { status: "COMPLETED", actualCompletedAt: t.actualCompletedAt ?? new Date() },
+    });
+    done += r.count;
+  }
+  console.log(`✓ 既有案件 ${cases.length} 件已補建新工作${done ? `（${done} 項因後續步驟已完成而標記完成）` : ""}`);
 }
 
 async function seedTemplates() {

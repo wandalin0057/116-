@@ -4,7 +4,7 @@ import { dbDateToISO, isoToDbDate, taipeiToday, type ISODate } from "@/lib/dates
 import { logger } from "@/lib/logger";
 import { loadBusinessDayService } from "@/server/business-days/calendar-repository";
 import { getEmailSettings } from "@/server/settings/settings-service";
-import { OPEN_TASK_STATUSES } from "@/server/schedule/task-types";
+import { COLLEAGUE_REMINDER_TASKS, OPEN_TASK_STATUSES } from "@/server/schedule/task-types";
 import { createMailer, type Mailer } from "./mailer";
 import { buildDigest, digestCount, renderDigestEmail, type ReminderTask } from "./reminder-builder";
 
@@ -75,11 +75,20 @@ async function loadAllTasks(): Promise<ReminderTask[]> {
   return tasks.filter((t) => t.overrideDueDate || t.calculatedDueDate).map(toReminderTask);
 }
 
-/** 取得使用者的提醒工作：指派給本人，或未指派且本人為案件負責人 */
-async function loadUserTasks(userId: string): Promise<ReminderTask[]> {
+/**
+ * 取得使用者的提醒工作：
+ * - 一般同事：指派給本人（或未指派且本人為案件負責人）之「同事提醒工作」（提供報告書、簡報、修正圖說）
+ * - 管理員（專案經理）：本人負責之工作，加上所有案件中不提醒同事的工作（創稿、發文、會議、紀錄等）
+ */
+async function loadUserTasks(user: { id: string; role: "ADMIN" | "USER" }): Promise<ReminderTask[]> {
+  const mine = { OR: [{ assignedUserId: user.id }, { assignedUserId: null, schoolCase: { responsibleUserId: user.id } }] };
+  const where: Prisma.TaskWhereInput =
+    user.role === "ADMIN"
+      ? { ...OPEN_TASK_WHERE, OR: [mine, { taskType: { notIn: COLLEAGUE_REMINDER_TASKS } }] }
+      : { ...OPEN_TASK_WHERE, ...mine, taskType: { in: COLLEAGUE_REMINDER_TASKS } };
   const tasks = await prisma.task.findMany({
-    where: { ...OPEN_TASK_WHERE, OR: [{ assignedUserId: userId }, { assignedUserId: null, schoolCase: { responsibleUserId: userId } }] },
-    include: { schoolCase: { select: { schoolName: true } } },
+    where,
+    include: { schoolCase: { select: { schoolName: true, responsibleUser: { select: { name: true } } } }, assignedUser: { select: { name: true } } },
   });
   return tasks.filter((t) => t.overrideDueDate || t.calculatedDueDate).map(toReminderTask);
 }
@@ -193,7 +202,7 @@ export async function runDailyReminders(options: RunOptions = {}): Promise<RunSu
         continue;
       }
       const type: NotificationType = overview ? "MANAGER_DIGEST" : "DAILY_DIGEST";
-      const tasks = overview ? await loadAllTasks() : await loadUserTasks(user.id);
+      const tasks = overview ? await loadAllTasks() : await loadUserTasks(user);
       const digest = buildDigest(tasks, pref, runDate, bds);
       const count = digestCount(digest);
       if (!count) {

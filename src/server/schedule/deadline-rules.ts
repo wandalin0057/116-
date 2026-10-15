@@ -14,6 +14,15 @@ export interface DeadlineRuleDef {
 /** 預設期限規則（依通學區規劃案作業流程） */
 export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
   {
+    taskType: "PRE_REPORT_PROVIDE",
+    title: "提供事前規劃報告書",
+    description: "事前規劃報告書提供圖說前第 2 個工作天，由負責同事提供報告書",
+    anchor: "PRE_REPORT_DISPATCH",
+    offsetBusinessDays: -2,
+    enabled: true,
+    sortOrder: 3,
+  },
+  {
     taskType: "PRE_REPORT_DISPATCH",
     title: "提供事前規劃及分析報告書圖說",
     description: "機關通知日（D0）後第 12 個工作天提供圖說",

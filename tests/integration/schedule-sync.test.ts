@@ -22,12 +22,12 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
     const tasks = await prisma.task.findMany({ where: { caseId: schoolCase.id } });
     // 通知日 2 項 + 審查會議 5 項
-    expect(tasks).toHaveLength(7);
+    expect(tasks).toHaveLength(8);
     expect((await dueOf(schoolCase.id, "PRE_REPORT_DISPATCH")).due).toBe("2026-11-02");
     expect((await dueOf(schoolCase.id, "PRE_REPORT_DRAFT")).due).toBe("2026-10-30");
     await syncCaseTasks(schoolCase.id, { actorId: u.id, source: "MANUAL_RECALC" });
     await syncCaseTasks(schoolCase.id, { actorId: u.id, source: "MANUAL_RECALC" });
-    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(7);
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(8);
   });
 
   it("10. 變更會議日期後期限正確更新，並保留異動歷史與差異預覽", async () => {
@@ -52,7 +52,7 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     const meetings = await prisma.meeting.findMany({ where: { caseId: schoolCase.id }, orderBy: { createdAt: "asc" } });
     expect(meetings.map((m) => m.status)).toEqual(["RESCHEDULED", "SCHEDULED"]);
     expect(await prisma.auditLog.count({ where: { action: "CASE_DATE_CHANGE" } })).toBe(1);
-    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(7);
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(8);
   });
 
   it("11. 已完成工作不會被重新設定為未完成，期限亦不變", async () => {
@@ -85,10 +85,10 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
   it("日期可分次填寫：補填會勘日期後才建立會勘工作", async () => {
     const u = await makeUser("pm@example.com");
     const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id, reviewMeetingDateTime: "" }));
-    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(2);
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(3);
     await updateCase(u, schoolCase.id, caseInput({ responsibleUserId: u.id, reviewMeetingDateTime: "", siteVisitDateTime: "2026-11-11T09:30" }));
     expect((await dueOf(schoolCase.id, "SITE_VISIT_SLIDES_UPLOAD")).due).toBe("2026-11-09");
-    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(7);
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id } })).toBe(8);
   });
 
   it("案件編號不得重複", async () => {
@@ -105,7 +105,7 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     expect(chen).toMatchObject({ name: "陳工程師", role: "USER", isActive: true });
     expect(schoolCase.responsibleUserId).toBe(chen.id);
     // 工作指派給負責人（提醒信寄給他）
-    expect(await prisma.task.count({ where: { caseId: schoolCase.id, assignedUserId: chen.id } })).toBe(7);
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id, assignedUserId: chen.id } })).toBe(8);
     // 自動建立的帳號不能直接登入
     expect((await authenticate("chen@example.com", "")).ok).toBe(false);
     // 第二所學校用同一個 Email：不重複建立帳號
@@ -115,7 +115,7 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     // 改負責人：工作轉給新負責人
     await updateCase(admin, schoolCase.id, caseInput({ responsibleName: "王工程師", responsibleEmail: "wang@example.com" }));
     const wang = await prisma.user.findUniqueOrThrow({ where: { email: "wang@example.com" } });
-    expect(await prisma.task.count({ where: { caseId: schoolCase.id, assignedUserId: wang.id } })).toBe(7);
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id, assignedUserId: wang.id } })).toBe(8);
   });
 
   it("標記完成與變更狀態僅限管理員；一般使用者（含負責人）只能檢視進度", async () => {

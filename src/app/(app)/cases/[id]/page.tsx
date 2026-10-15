@@ -41,7 +41,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   if (!(await canAccessCase(user, id, "view"))) notFound();
   const [c, bds, users, canEdit] = await Promise.all([getCaseDetail(user, id), loadBusinessDayService(), listUsers(), canAccessCase(user, id, "edit")]);
   const today = taipeiToday();
-  const order = ["PRE_REPORT_DRAFT", "PRE_REPORT_DISPATCH", "REVIEW_SLIDES_EMAIL", "REVIEW_MEETING", "REVIEW_MINUTES_EMAIL", "REVIEW_DRAWING_DRAFT", "REVIEW_DRAWING_DISPATCH", "SITE_VISIT_SLIDES_UPLOAD", "SITE_VISIT", "SITE_VISIT_MINUTES_EMAIL", "SITE_VISIT_DRAWING_DRAFT", "SITE_VISIT_DRAWING_DISPATCH"];
+  const order = ["PRE_REPORT_PROVIDE", "PRE_REPORT_DRAFT", "PRE_REPORT_DISPATCH", "REVIEW_SLIDES_EMAIL", "REVIEW_MEETING", "REVIEW_MINUTES_EMAIL", "REVIEW_DRAWING_DRAFT", "REVIEW_DRAWING_DISPATCH", "SITE_VISIT_SLIDES_UPLOAD", "SITE_VISIT", "SITE_VISIT_MINUTES_EMAIL", "SITE_VISIT_DRAWING_DRAFT", "SITE_VISIT_DRAWING_DISPATCH"];
   const tasks = [...c.tasks].sort((a, b) => order.indexOf(a.taskType) - order.indexOf(b.taskType)).map((t) => ({ ...t, due: computeDueInfo(t, bds, today) }));
   const histories = c.tasks
     .flatMap((t) => t.histories.map((h) => ({ ...h, taskTitle: t.title })))

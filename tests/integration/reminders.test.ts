@@ -26,7 +26,7 @@ describe.skipIf(!hasTestDb)("12. 每日提醒排程", () => {
   });
 
   it("同一日重複執行不重複寄信", async () => {
-    const u = await makeUser("pm@example.com");
+    const u = await makeUser("pm@example.com", "ADMIN");
     await createCase(u, caseInput({ responsibleUserId: u.id }));
     const mailer = fakeMailer();
     const first = await runDailyReminders({ now: NOW, mailer, trigger: "MANUAL" });
@@ -40,6 +40,26 @@ describe.skipIf(!hasTestDb)("12. 每日提醒排程", () => {
     // 10/30 為事前規劃報告書創稿期限（今日到期）
     expect(msg.text).toContain("今日到期（1）");
     expect(await prisma.jobRun.count()).toBe(2);
+  });
+
+  it("同事只收到提供報告書／簡報／修正圖說提醒；創稿等其他工作只提醒管理員", async () => {
+    const pm = await makeUser("pm@example.com", "ADMIN");
+    const eng = await makeUser("eng@example.com");
+    await createCase(pm, caseInput({ responsibleUserId: eng.id }));
+    const mailer = fakeMailer();
+    const r = await runDailyReminders({ now: NOW, mailer, trigger: "MANUAL" });
+    expect(r.sent).toBe(2);
+    const byTo = new Map(mailer.send.mock.calls.map((c: [{ to: string; text: string }]) => [c[0].to, c[0].text]));
+    const engText = byTo.get("eng@example.com")!;
+    const pmText = byTo.get("pm@example.com")!;
+    expect(engText).toContain("｜提供事前規劃報告書｜");
+    expect(engText).toContain("｜寄送審查簡報｜");
+    expect(engText).toContain("｜審查後提供修正圖說｜");
+    expect(engText).not.toContain("創稿");
+    expect(engText).not.toContain("審查會議｜");
+    expect(pmText).toContain("｜事前規劃報告書創稿｜");
+    expect(pmText).toContain("｜審查會議｜");
+    expect(pmText).not.toContain("｜提供事前規劃報告書｜");
   });
 
   it("寄送失敗會記錄並可安全重試", async () => {

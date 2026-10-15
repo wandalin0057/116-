@@ -1,6 +1,7 @@
 import type { DeadlineAnchor, TaskStatus, TaskType } from "@prisma/client";
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  PRE_REPORT_PROVIDE: "提供事前規劃報告書",
   PRE_REPORT_DRAFT: "事前規劃報告書創稿",
   PRE_REPORT_DISPATCH: "事前規劃報告書提供圖說",
   REVIEW_SLIDES_EMAIL: "寄送審查簡報",
@@ -33,6 +34,7 @@ export const ANCHOR_LABELS: Record<DeadlineAnchor, string> = {
 export type TaskCategory = "DRAFT" | "DISPATCH" | "EMAIL" | "UPLOAD" | "EVENT";
 
 export const TASK_CATEGORY: Record<TaskType, TaskCategory> = {
+  PRE_REPORT_PROVIDE: "DISPATCH",
   PRE_REPORT_DRAFT: "DRAFT",
   PRE_REPORT_DISPATCH: "DISPATCH",
   REVIEW_SLIDES_EMAIL: "EMAIL",
@@ -75,6 +77,17 @@ export const TASK_COLORS: Record<TaskCategory, { bg: string; text: string; borde
   UPLOAD: { bg: "bg-violet-50", text: "text-violet-800", border: "border-violet-300", dot: "bg-violet-600", label: "上傳簡報" },
   EVENT: { bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-300", dot: "bg-rose-600", label: "會議／會勘" },
 };
+
+/**
+ * 會寄 Email 提醒給負責同事的工作；其餘工作（創稿、發文、會議、紀錄等）只提醒管理員（專案經理）。
+ */
+export const COLLEAGUE_REMINDER_TASKS: TaskType[] = [
+  "PRE_REPORT_PROVIDE",
+  "SITE_VISIT_SLIDES_UPLOAD",
+  "REVIEW_SLIDES_EMAIL",
+  "SITE_VISIT_DRAWING_DISPATCH",
+  "REVIEW_DRAWING_DISPATCH",
+];
 
 export const OPEN_TASK_STATUSES: TaskStatus[] = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD"];
 export const CLOSED_TASK_STATUSES: TaskStatus[] = ["COMPLETED", "CANCELLED"];
