@@ -39,27 +39,34 @@ function renderBody(d: Draft, sig: FormattedSignature | null) {
   return withUrl(d).split("{signature}").join(signatureText(sig));
 }
 
+/** 將內文（含格式化簽名檔）寫入剪貼簿；成功回傳 true，不支援時只複製文字並回傳 false */
+async function copyRich(html: string, text: string): Promise<boolean> {
+  try {
+    if (typeof ClipboardItem === "undefined") throw new Error("unsupported");
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        // 轉成 Outlook 相容格式（行內字型、十六進位顏色、圖片寬高）
+        "text/html": toOutlookHtml(html).then((h) => new Blob([h], { type: "text/html" })),
+        "text/plain": new Blob([text], { type: "text/plain" }),
+      }),
+    ]);
+    return true;
+  } catch {
+    await navigator.clipboard.writeText(text).catch(() => undefined);
+    return false;
+  }
+}
+
 function RichCopyButton({ html, text, hasImage }: { html: string; text: string; hasImage: boolean }) {
   const [done, setDone] = useState(false);
   return (
     <Button
       type="button"
       size="sm"
+      variant="outline"
       onClick={async () => {
-        try {
-          if (typeof ClipboardItem === "undefined") throw new Error("unsupported");
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              // 轉成 Outlook 相容格式（行內字型、十六進位顏色、圖片寬高）
-              "text/html": toOutlookHtml(html).then((h) => new Blob([h], { type: "text/html" })),
-              "text/plain": new Blob([text], { type: "text/plain" }),
-            }),
-          ]);
-          toast.success("已複製（含簽名圖片），請到 Outlook 新郵件內文按 Ctrl+V 貼上");
-        } catch {
-          await navigator.clipboard.writeText(text).catch(() => undefined);
-          toast.warning("此瀏覽器不支援複製圖片，已只複製文字；建議使用 Chrome 或 Edge");
-        }
+        if (await copyRich(html, text)) toast.success("已複製（含簽名圖片），請到 Outlook 新郵件內文按 Ctrl+V 貼上");
+        else toast.warning("此瀏覽器不支援複製圖片，已只複製文字；建議使用 Chrome 或 Edge");
         setDone(true);
         setTimeout(() => setDone(false), 1500);
       }}
@@ -71,15 +78,40 @@ function RichCopyButton({ html, text, hasImage }: { html: string; text: string; 
 }
 
 /**
- * 以郵件程式開啟（含簽名檔）：產生 Outlook 郵件檔（.eml）。
- * mailto: 連結只能帶純文字，因此改用郵件檔；開啟後即為含完整格式與簽名圖片的新郵件。
+ * 以郵件程式開啟（含簽名檔）：與純文字版相同直接開啟郵件程式（帶入收件人、副本、主旨），
+ * 同時把含格式與簽名圖片的內文放進剪貼簿，在新郵件內文按 Ctrl+V 即可。
+ * （mailto: 連結依規格只能帶純文字，無法直接帶入圖片與樣式。）
  */
+function OpenWithSignatureButton({ d, signature }: { d: Draft; signature: FormattedSignature | null }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        const rich = await copyRich(buildEmailHtml(withUrl(d), signature), renderBody(d, signature));
+        setBusy(false);
+        window.location.href = mailto(d, signature, false);
+        if (rich) toast.success("已開啟郵件程式。請在新郵件的內文按 Ctrl+V，貼上內文與簽名檔", { duration: 10_000 });
+        else toast.warning("已開啟郵件程式，但此瀏覽器無法複製圖片，請在內文按 Ctrl+V 貼上文字", { duration: 10_000 });
+      }}
+    >
+      {busy ? <Loader2 className="animate-spin" /> : <MailOpen />}
+      以郵件程式開啟（含簽名檔）
+    </Button>
+  );
+}
+
+/** 備用：下載 Outlook 郵件檔（.eml），開啟即為含完整格式與簽名圖片的新郵件 */
 function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSignature | null }) {
   const [busy, setBusy] = useState(false);
   return (
     <Button
       type="button"
       size="sm"
+      variant="ghost"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -94,7 +126,7 @@ function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSig
           a.click();
           a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 10_000);
-          toast.success("郵件已產生，請點瀏覽器下載區的檔案，Outlook 會開啟新郵件（含簽名檔）", { duration: 8000 });
+          toast.success("已下載郵件檔，點一下下載區的檔案即以 Outlook 開啟");
         } catch {
           toast.error("無法產生郵件檔，請改用「複製內文」");
         } finally {
@@ -102,15 +134,15 @@ function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSig
         }
       }}
     >
-      {busy ? <Loader2 className="animate-spin" /> : <MailOpen />}
-      以郵件程式開啟（含簽名檔）
+      下載郵件檔（備用）
     </Button>
   );
 }
 
-function mailto(d: Draft, sig: FormattedSignature | null) {
+function mailto(d: Draft, sig: FormattedSignature | null, withBody = true) {
   const split = (s: string) => s.split(/[,;，；\s]+/).filter(Boolean).join(",");
-  const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(renderBody(d, sig))}`];
+  const q = [`subject=${encodeURIComponent(d.subject)}`];
+  if (withBody) q.push(`body=${encodeURIComponent(renderBody(d, sig))}`);
   if (d.ccRecipients) q.unshift(`cc=${encodeURIComponent(split(d.ccRecipients))}`);
   return `mailto:${split(d.toRecipients)}?${q.join("&")}`;
 }
@@ -211,12 +243,13 @@ export function EmailEditor({
             )}
             <CopyButton text={d.toRecipients} label="複製收件人" />
             <CopyButton text={d.subject} label="複製主旨" />
-            <OutlookFileButton d={d} signature={signature} />
+            <OpenWithSignatureButton d={d} signature={signature} />
             <RichCopyButton html={buildEmailHtml(withUrl(d), signature)} text={renderBody(d, signature)} hasImage={!!signature?.html.includes("<img")} />
             <CopyButton text={() => renderBody(d, signature)} label="複製純文字" />
             <Button asChild variant="ghost" size="sm">
               <a href={mailto(d, signature)}>以郵件程式開啟（純文字）</a>
             </Button>
+            <OutlookFileButton d={d} signature={signature} />
             {canEdit && (d.status !== "CONFIRMED_SENT" || isAdmin) && (
               <DeleteEmailDraftButton id={d.id} schoolName={schoolName} sent={d.status === "CONFIRMED_SENT"} redirectTo="/emails" size="sm" />
             )}
@@ -254,7 +287,7 @@ export function EmailEditor({
               dangerouslySetInnerHTML={{ __html: buildEmailHtml(withUrl(d), signature) }}
             />
             <p className="text-xs text-muted-foreground">
-              按「以郵件程式開啟（含簽名檔）」後，點瀏覽器下載區的檔案，Outlook 即開啟新郵件，字型、顏色與簽名圖片與設定相同。想每次自動開啟：在下載區該檔案旁按「⋯」選「一律開啟這類檔案」。
+              按「以郵件程式開啟（含簽名檔）」會開啟 Outlook 新郵件（已填好收件人與主旨），在內文按 <strong>Ctrl+V</strong> 即貼上內文與簽名檔（含圖片與樣式）。
             </p>
           </CardContent>
         </Card>
