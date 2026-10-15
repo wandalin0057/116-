@@ -34,6 +34,8 @@ model User {
   emailSignature    String?
   // 簽名檔圖片（data URL，已於瀏覽器端縮小，上限約 300KB）
   signatureImage    String?
+  // 簽名檔樣式（字型、大小、顏色、圖片寬度與位置）
+  signatureStyle    Json?
   createdAt         DateTime  @default(now()) @db.Timestamptz
   updatedAt         DateTime  @updatedAt @db.Timestamptz
 

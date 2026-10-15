@@ -5,14 +5,14 @@ import {
   changeOwnPasswordAction,
   sendTestEmailAction,
   updateEmailSettingsAction,
-  updateEmailSignatureAction,
-  updateSignatureImageAction,
+  saveSignatureAction,
   updateOrganizationAction,
   updateReminderPreferenceAction,
 } from "@/app/actions/settings";
 import { useAction } from "@/components/common/use-action";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea } from "@/components/ui/input";
+import { Input, Select, Textarea } from "@/components/ui/input";
+import { DEFAULT_SIGNATURE_STYLE, SIGNATURE_FONTS, signatureHtml, type SignatureData, type SignatureStyle } from "@/lib/signature";
 import { Label } from "@/components/ui/label";
 
 export function ChangePasswordForm() {
@@ -155,21 +155,6 @@ export function EmailSettingsForm({ initial }: { initial: { testMode: boolean; t
   );
 }
 
-export function SignatureForm({ initial, placeholder }: { initial: string; placeholder: string }) {
-  const [v, setV] = useState(initial);
-  const { run, pending } = useAction();
-  return (
-    <div className="max-w-lg space-y-3">
-      <Textarea rows={7} value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} aria-label="Email 簽名檔" />
-      <p className="text-xs text-muted-foreground">會放在 Email 草稿內文的最後面（範本中的 {"{signature}"}）。已建立的草稿不會改變。</p>
-      <Button disabled={pending || v === initial} onClick={() => run(() => updateEmailSignatureAction(v))}>
-        {pending ? <Loader2 className="animate-spin" /> : <Save />}
-        儲存簽名檔
-      </Button>
-    </div>
-  );
-}
-
 type Org = { companyName: string; address: string; contactName: string; phone: string; fax: string; email: string };
 
 export function OrganizationForm({ initial }: { initial: Org }) {
@@ -205,7 +190,7 @@ export function OrganizationForm({ initial }: { initial: Org }) {
   );
 }
 
-const SIG_MAX_WIDTH = 480;
+const SIG_MAX_WIDTH = 600;
 const SIG_MAX_CHARS = 400_000;
 
 /** 讀取圖片並縮小（寬度上限 480px），回傳 data URL */
@@ -246,50 +231,152 @@ async function shrinkImage(file: File): Promise<string> {
   return out;
 }
 
-export function SignatureImageForm({ initial }: { initial: string | null }) {
-  const [img, setImg] = useState<string | null>(initial);
+const PT_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24];
+
+export function SignatureEditor({ initial, namePlaceholder }: { initial: SignatureData; namePlaceholder: string }) {
+  const [text, setText] = useState(initial.text);
+  const [image, setImage] = useState<string | null>(initial.image);
+  const [style, setStyle] = useState<SignatureStyle>(initial.style);
   const [err, setErr] = useState("");
   const { run, pending } = useAction();
+  const set = <K extends keyof SignatureStyle>(k: K, v: SignatureStyle[K]) => setStyle((s) => ({ ...s, [k]: v }));
+  const dirty = text !== initial.text || image !== initial.image || JSON.stringify(style) !== JSON.stringify(initial.style);
+
+  const sizeSelect = (id: string, value: number, onChange: (n: number) => void, max = 24) => (
+    <Select id={id} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-24">
+      {PT_OPTIONS.filter((n) => n <= max).map((n) => (
+        <option key={n} value={n}>
+          {n} pt
+        </option>
+      ))}
+    </Select>
+  );
+
   return (
-    <div className="max-w-lg space-y-3">
-      {img ? (
-        <div className="rounded-md border bg-white p-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img} alt="簽名圖片預覽" className="max-h-40 max-w-full" />
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">尚未設定簽名圖片。</p>
-      )}
-      <Input
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
-        aria-label="選擇簽名圖片"
-        onChange={async (e) => {
-          setErr("");
-          const f = e.target.files?.[0];
-          if (!f) return;
-          if (f.size > 10_000_000) return setErr("檔案超過 10MB，請換一張較小的圖片");
-          try {
-            const data = await shrinkImage(f);
-            if (data.length > SIG_MAX_CHARS) return setErr("圖片太大，請換一張較小的圖片");
-            setImg(data);
-          } catch (x) {
-            setErr(x instanceof Error ? x.message : "無法讀取圖片");
-          }
-        }}
-      />
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      <p className="text-xs text-muted-foreground">建議使用公司 Logo 或名片圖檔（PNG／JPG）。過大的圖片會自動縮小為寬 480 像素。</p>
-      <div className="flex gap-2">
-        <Button disabled={pending || img === initial} onClick={() => run(() => updateSignatureImageAction(img))}>
-          {pending ? <Loader2 className="animate-spin" /> : <Save />}
-          儲存簽名圖片
-        </Button>
-        {initial && (
-          <Button variant="outline" disabled={pending} onClick={() => run(() => updateSignatureImageAction(null), { onSuccess: () => setImg(null) })}>
-            移除圖片
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className="space-y-5">
+        <section className="space-y-2">
+          <Label htmlFor="sig-text">簽名文字（第一行通常是姓名與職稱）</Label>
+          <Textarea id="sig-text" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={namePlaceholder} />
+        </section>
+
+        <section className="space-y-3 rounded-md border p-3">
+          <p className="text-sm font-semibold">文字樣式</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="sig-font">字型</Label>
+              <Select id="sig-font" value={style.fontFamily} onChange={(e) => set("fontFamily", e.target.value as SignatureStyle["fontFamily"])} className="w-36">
+                {Object.entries(SIGNATURE_FONTS).map(([k, f]) => (
+                  <option key={k} value={k}>
+                    {f.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sig-size">文字大小</Label>
+              {sizeSelect("sig-size", style.fontSizePt, (n) => set("fontSizePt", n))}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sig-color">文字顏色</Label>
+              <Input id="sig-color" type="color" value={style.color} onChange={(e) => set("color", e.target.value)} className="h-9 w-16 p-1" />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-3 border-t pt-3">
+            <div className="space-y-1">
+              <Label htmlFor="sig-first-size">第一行大小</Label>
+              {sizeSelect("sig-first-size", style.firstLineSizePt, (n) => set("firstLineSizePt", n))}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sig-first-color">第一行顏色</Label>
+              <Input id="sig-first-color" type="color" value={style.firstLineColor} onChange={(e) => set("firstLineColor", e.target.value)} className="h-9 w-16 p-1" />
+            </div>
+            <label className="flex h-9 items-center gap-2 text-sm">
+              <input type="checkbox" className="h-4 w-4" checked={style.firstLineBold} onChange={(e) => set("firstLineBold", e.target.checked)} />
+              第一行粗體
+            </label>
+          </div>
+        </section>
+
+        <section className="space-y-3 rounded-md border p-3">
+          <p className="text-sm font-semibold">簽名圖片</p>
+          <Input
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            aria-label="選擇簽名圖片"
+            onChange={async (e) => {
+              setErr("");
+              const f = e.target.files?.[0];
+              if (!f) return;
+              if (f.size > 10_000_000) return setErr("檔案超過 10MB，請換一張較小的圖片");
+              try {
+                const data = await shrinkImage(f);
+                if (data.length > SIG_MAX_CHARS) return setErr("圖片太大，請換一張較小的圖片");
+                setImage(data);
+              } catch (x) {
+                setErr(x instanceof Error ? x.message : "無法讀取圖片");
+              }
+            }}
+          />
+          {err && <p className="text-sm text-red-600">{err}</p>}
+          {image && (
+            <>
+              <div className="space-y-1">
+                <Label htmlFor="sig-img-width">圖片寬度：{style.imageWidth} 像素</Label>
+                <input
+                  id="sig-img-width"
+                  type="range"
+                  min={40}
+                  max={600}
+                  step={10}
+                  value={style.imageWidth}
+                  onChange={(e) => set("imageWidth", Number(e.target.value))}
+                  className="w-full accent-[hsl(var(--primary))]"
+                />
+                <div className="flex gap-1">
+                  {[120, 180, 240, 320, 480].map((w) => (
+                    <Button key={w} type="button" size="xs" variant={style.imageWidth === w ? "default" : "outline"} onClick={() => set("imageWidth", w)}>
+                      {w}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Label htmlFor="sig-img-pos">圖片位置</Label>
+                <Select id="sig-img-pos" value={style.imagePosition} onChange={(e) => set("imagePosition", e.target.value as SignatureStyle["imagePosition"])} className="w-32">
+                  <option value="below">文字下方</option>
+                  <option value="above">文字上方</option>
+                </Select>
+                <Button type="button" variant="outline" size="sm" onClick={() => setImage(null)}>
+                  移除圖片
+                </Button>
+              </div>
+            </>
+          )}
+          <p className="text-xs text-muted-foreground">建議使用公司 Logo 或名片圖檔（PNG／JPG），過大的圖片會自動縮小。</p>
+        </section>
+
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={pending || !dirty} onClick={() => run(() => saveSignatureAction({ text, image, style }))}>
+            {pending ? <Loader2 className="animate-spin" /> : <Save />}
+            儲存簽名檔
           </Button>
-        )}
+          <Button type="button" variant="ghost" onClick={() => setStyle(DEFAULT_SIGNATURE_STYLE)}>
+            樣式恢復預設
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-medium text-slate-700">即時預覽（收件人看到的樣子）</p>
+        <div className="rounded-md border bg-white p-4">
+          <p className="mb-3 text-sm text-slate-500">您好，……請查收，謝謝。</p>
+          <div
+            // 由 signatureHtml 產生：文字已跳脫、樣式經白名單驗證
+            dangerouslySetInnerHTML={{ __html: signatureHtml({ text: text || namePlaceholder, image, style }) }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">儲存後，Email 草稿的 {"{signature}"} 會套用這個簽名檔；使用「複製內文（含簽名圖片）」貼到 Outlook 即可保留樣式與圖片。</p>
       </div>
     </div>
   );

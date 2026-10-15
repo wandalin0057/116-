@@ -167,4 +167,18 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     await updateSignatureImage(u, null);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: u.id } })).signatureImage).toBeNull();
   });
+
+  it("儲存簽名檔（文字＋圖片＋樣式），新 Email 草稿保留 {signature} 供套用", async () => {
+    const { saveSignature, getSignature } = await import("@/server/users/user-service");
+    const { DEFAULT_SIGNATURE_STYLE } = await import("@/lib/signature");
+    const u = await makeUser("pm@example.com");
+    const png = "data:image/png;base64," + Buffer.from("x").toString("base64");
+    await saveSignature(u, { text: "林映辰 規劃師", image: png, style: { ...DEFAULT_SIGNATURE_STYLE, imageWidth: 200 } });
+    const sig = await getSignature(u.id);
+    expect(sig).toMatchObject({ text: "林映辰 規劃師", image: png, style: { imageWidth: 200 } });
+    await expect(saveSignature(u, { text: "x", image: null, style: { ...DEFAULT_SIGNATURE_STYLE, color: "red" } })).rejects.toThrow(/顏色/);
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const draft = await createEmailDraft(u, { caseId: schoolCase.id, templateType: "REVIEW_MINUTES_EMAIL" });
+    expect(draft.body.trim().endsWith("{signature}")).toBe(true);
+  });
 });

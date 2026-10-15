@@ -67,7 +67,8 @@ export async function createEmailDraft(user: AuthUser, input: { caseId: string; 
     notificationRound: schoolCase.notificationRound,
   });
   // 下載連結於草稿頁填寫，內文保留 {attachmentUrl} 於預覽／複製時代入
-  const keep = ["attachmentUrl"];
+  // 簽名檔保留 {signature}，於預覽／複製時代入（套用最新的簽名檔樣式與圖片）
+  const keep = ["attachmentUrl", "signature"];
   const taskId =
     input.taskId ??
     (await prisma.task.findUnique({ where: { caseId_taskType: { caseId: input.caseId, taskType: EMAIL_TASK[input.templateType] } }, select: { id: true } }))?.id ??

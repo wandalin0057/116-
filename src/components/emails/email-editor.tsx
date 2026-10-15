@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DeleteEmailDraftButton } from "./delete-email-draft-button";
-import { buildEmailHtml } from "./email-html";
+import { buildEmailHtml, signatureText, type SignatureData } from "@/lib/signature";
 
 interface Draft {
   id: string;
@@ -27,12 +27,17 @@ interface Draft {
   agencyContact: string;
 }
 
-/** 將內文中的 {attachmentUrl} 代入下載連結 */
-function renderBody(d: Draft) {
+/** 代入下載連結（簽名檔仍保留 {signature}，供 HTML 版本套用樣式） */
+function withUrl(d: Draft) {
   return d.attachmentUrl ? d.body.split("{attachmentUrl}").join(d.attachmentUrl) : d.body;
 }
 
-function RichCopyButton({ text, signatureImage }: { text: string; signatureImage: string | null }) {
+/** 純文字內文：代入下載連結與簽名檔文字 */
+function renderBody(d: Draft, sig: SignatureData | null) {
+  return withUrl(d).split("{signature}").join(signatureText(sig));
+}
+
+function RichCopyButton({ html, text, hasImage }: { html: string; text: string; hasImage: boolean }) {
   const [done, setDone] = useState(false);
   return (
     <Button
@@ -43,7 +48,7 @@ function RichCopyButton({ text, signatureImage }: { text: string; signatureImage
           if (typeof ClipboardItem === "undefined") throw new Error("unsupported");
           await navigator.clipboard.write([
             new ClipboardItem({
-              "text/html": new Blob([buildEmailHtml(text, signatureImage)], { type: "text/html" }),
+              "text/html": new Blob([html], { type: "text/html" }),
               "text/plain": new Blob([text], { type: "text/plain" }),
             }),
           ]);
@@ -57,14 +62,14 @@ function RichCopyButton({ text, signatureImage }: { text: string; signatureImage
       }}
     >
       {done ? <Check /> : <ImageIcon />}
-      {signatureImage ? "複製內文（含簽名圖片）" : "複製內文（含格式）"}
+      {hasImage ? "複製內文（含簽名圖片）" : "複製內文（含格式）"}
     </Button>
   );
 }
 
-function mailto(d: Draft) {
+function mailto(d: Draft, sig: SignatureData | null) {
   const split = (s: string) => s.split(/[,;，；\s]+/).filter(Boolean).join(",");
-  const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(renderBody(d))}`];
+  const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(renderBody(d, sig))}`];
   if (d.ccRecipients) q.unshift(`cc=${encodeURIComponent(split(d.ccRecipients))}`);
   return `mailto:${split(d.toRecipients)}?${q.join("&")}`;
 }
@@ -74,13 +79,13 @@ export function EmailEditor({
   canEdit,
   schoolName,
   isAdmin = false,
-  signatureImage = null,
+  signature = null,
 }: {
   draft: Draft;
   canEdit: boolean;
   schoolName: string;
   isAdmin?: boolean;
-  signatureImage?: string | null;
+  signature?: SignatureData | null;
 }) {
   const [d, setD] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -150,6 +155,11 @@ export function EmailEditor({
           <div className="space-y-1.5">
             <Label htmlFor="body">內文</Label>
             <Textarea id="body" rows={14} value={d.body} onChange={set("body")} disabled={locked} />
+            {d.body.includes("{signature}") && (
+              <p className="text-xs text-muted-foreground">
+                {"{signature}"} 會自動換成你的簽名檔（文字、圖片與樣式），可到「系統設定 → 個人帳號」編輯。
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {!locked && (
@@ -160,10 +170,10 @@ export function EmailEditor({
             )}
             <CopyButton text={d.toRecipients} label="複製收件人" />
             <CopyButton text={d.subject} label="複製主旨" />
-            <RichCopyButton text={renderBody(d)} signatureImage={signatureImage} />
-            <CopyButton text={() => renderBody(d)} label="複製純文字" />
+            <RichCopyButton html={buildEmailHtml(withUrl(d), signature)} text={renderBody(d, signature)} hasImage={!!signature?.image} />
+            <CopyButton text={() => renderBody(d, signature)} label="複製純文字" />
             <Button asChild variant="outline" size="sm">
-              <a href={mailto(d)}>
+              <a href={mailto(d, signature)}>
                 <MailOpen />
                 以郵件程式開啟
               </a>
@@ -199,14 +209,12 @@ export function EmailEditor({
               <span className="text-muted-foreground">附件：</span>
               {d.attachmentNames || "—"}
             </p>
-            <div className="mt-2 whitespace-pre-wrap break-all rounded-md border bg-white p-4 leading-relaxed">
-              {renderBody(d)}
-              {signatureImage && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={signatureImage} alt="簽名圖片" className="mt-2 block max-w-[480px]" style={{ maxWidth: "min(480px, 100%)" }} />
-              )}
-            </div>
-            {signatureImage && <p className="text-xs text-muted-foreground">「以郵件程式開啟」只能帶入文字；要含簽名圖片，請用「複製內文（含簽名圖片）」再貼到 Outlook。</p>}
+            <div
+              className="mt-2 break-all rounded-md border bg-white p-4 leading-relaxed"
+              // 內容由 buildEmailHtml 產生：內文已跳脫、樣式經白名單驗證
+              dangerouslySetInnerHTML={{ __html: buildEmailHtml(withUrl(d), signature) }}
+            />
+            {signature?.image && <p className="text-xs text-muted-foreground">「以郵件程式開啟」只能帶入文字；要含簽名圖片與樣式，請用「複製內文（含簽名圖片）」再貼到 Outlook。</p>}
           </CardContent>
         </Card>
         {canEdit && d.status === "DRAFT" && (

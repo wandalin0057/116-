@@ -1,5 +1,6 @@
 import type { UserRole } from "@prisma/client";
 import { z } from "zod";
+import { normalizeSignatureStyle, signatureStyleSchema } from "@/lib/signature";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/server/audit/audit";
 import { hashPassword, validatePasswordStrength, verifyPassword } from "@/server/auth/password";
@@ -143,4 +144,28 @@ export async function updateSignatureImage(user: AuthUser, dataUrl: string | nul
   }
   await prisma.user.update({ where: { id: user.id }, data: { signatureImage: dataUrl } });
   await writeAudit({ actorId: user.id, action: "USER_SIGNATURE_IMAGE", entityType: "User", entityId: user.id, summary: dataUrl ? "設定 Email 簽名圖片" : "移除 Email 簽名圖片" });
+}
+
+/** 一次儲存簽名檔文字、圖片與樣式 */
+export async function saveSignature(user: AuthUser, input: { text: string; image: string | null; style: unknown }) {
+  const text = input.text.replace(/\r\n/g, "\n").trim();
+  if (text.length > 1000) throw new ValidationError("簽名檔不可超過 1000 字");
+  if (input.image !== null) {
+    if (!SIGNATURE_IMAGE_RE.test(input.image)) throw new ValidationError("圖片格式不支援，請使用 PNG、JPG、GIF 或 WebP");
+    if (input.image.length > SIGNATURE_IMAGE_MAX_CHARS) throw new ValidationError("圖片太大，請使用較小的圖片（約 300KB 以內）");
+  }
+  const style = signatureStyleSchema.safeParse(input.style);
+  if (!style.success) throw new ValidationError(style.error.issues[0]?.message ?? "簽名檔樣式設定錯誤");
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailSignature: text || null, signatureImage: input.image, signatureStyle: style.data },
+  });
+  await writeAudit({ actorId: user.id, action: "USER_SIGNATURE_UPDATE", entityType: "User", entityId: user.id, summary: "更新 Email 簽名檔（文字、圖片、樣式）" });
+}
+
+/** 取得使用者簽名檔（Email 草稿使用） */
+export async function getSignature(userId: string) {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { emailSignature: true, signatureImage: true, signatureStyle: true, name: true } });
+  if (!u) return null;
+  return { text: u.emailSignature ?? u.name, image: u.signatureImage, style: normalizeSignatureStyle(u.signatureStyle) };
 }

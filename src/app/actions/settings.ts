@@ -20,8 +20,7 @@ import {
   changeOwnPassword,
   createUser,
   resetUserPassword,
-  updateEmailSignature,
-  updateSignatureImage,
+  saveSignature,
   updateReminderPreference,
   updateUser,
 } from "@/server/users/user-service";
@@ -40,11 +39,8 @@ export async function updateUserAction(id: string, input: { name: string; role: 
 export async function resetUserPasswordAction(id: string, password: string) {
   return runAction(async () => resetUserPassword(await requireAdminForAction(), id, password), "密碼已重設，該使用者需重新登入");
 }
-export async function updateEmailSignatureAction(signature: string) {
-  return runAction(async () => updateEmailSignature(await requireUserForAction(), signature), "簽名檔已儲存，之後新建立的 Email 草稿會使用");
-}
-export async function updateSignatureImageAction(dataUrl: string | null) {
-  return runAction(async () => updateSignatureImage(await requireUserForAction(), dataUrl), dataUrl ? "簽名圖片已儲存" : "簽名圖片已移除");
+export async function saveSignatureAction(input: { text: string; image: string | null; style: unknown }) {
+  return runAction(async () => saveSignature(await requireUserForAction(), input), "簽名檔已儲存");
 }
 export async function updateOrganizationAction(input: { companyName: string; address: string; contactName: string; phone: string; fax: string; email: string }) {
   return runAction(async () => updateOrganization(await requireAdminForAction(), input), "發文單位資訊已儲存");

@@ -4,7 +4,7 @@ import { EmailEditor } from "@/components/emails/email-editor";
 import { PageHeader } from "@/components/common/page-header";
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getSignature } from "@/server/users/user-service";
 import { formatROCDateTime, toTaipeiDateTimeInput } from "@/lib/dates";
 import { canAccessCase } from "@/server/auth/permissions";
 import { EMAIL_DRAFT_STATUS_LABELS, getEmailDraft } from "@/server/emails/email-draft-service";
@@ -22,8 +22,7 @@ export default async function EmailPage({ params }: { params: Promise<{ id: stri
   });
   const canEdit = await canAccessCase(user, draft.caseId, "edit");
   // 簽名圖片使用草稿建立者的設定（無建立者時用目前使用者）
-  const signer = await prisma.user.findUnique({ where: { id: draft.createdById ?? user.id }, select: { signatureImage: true } });
-  const signatureImage = signer?.signatureImage ?? null;
+  const signature = await getSignature(draft.createdById ?? user.id);
   return (
     <>
       <PageHeader
@@ -43,7 +42,7 @@ export default async function EmailPage({ params }: { params: Promise<{ id: stri
         canEdit={canEdit}
         schoolName={draft.schoolCase.schoolName}
         isAdmin={user.role === "ADMIN"}
-        signatureImage={signatureImage}
+        signature={signature}
         draft={{
           id: draft.id,
           status: draft.status,
