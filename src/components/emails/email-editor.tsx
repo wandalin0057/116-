@@ -77,33 +77,6 @@ function RichCopyButton({ html, text, hasImage }: { html: string; text: string; 
   );
 }
 
-/**
- * 以郵件程式開啟（含簽名檔）：與純文字版相同直接開啟郵件程式（帶入收件人、副本、主旨），
- * 同時把含格式與簽名圖片的內文放進剪貼簿，在新郵件內文按 Ctrl+V 即可。
- * （mailto: 連結依規格只能帶純文字，無法直接帶入圖片與樣式。）
- */
-function OpenWithSignatureButton({ d, signature }: { d: Draft; signature: FormattedSignature | null }) {
-  const [busy, setBusy] = useState(false);
-  return (
-    <Button
-      type="button"
-      size="sm"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        const rich = await copyRich(buildEmailHtml(withUrl(d), signature), renderBody(d, signature));
-        setBusy(false);
-        window.location.href = mailto(d, signature, false);
-        if (rich) toast.success("已開啟郵件程式。請在新郵件的內文按 Ctrl+V，貼上內文與簽名檔", { duration: 10_000 });
-        else toast.warning("已開啟郵件程式，但此瀏覽器無法複製圖片，請在內文按 Ctrl+V 貼上文字", { duration: 10_000 });
-      }}
-    >
-      {busy ? <Loader2 className="animate-spin" /> : <MailOpen />}
-      以郵件程式開啟（含簽名檔）
-    </Button>
-  );
-}
-
 /** 備用：下載 Outlook 郵件檔（.eml），開啟即為含完整格式與簽名圖片的新郵件 */
 function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSignature | null }) {
   const [busy, setBusy] = useState(false);
@@ -139,10 +112,14 @@ function OutlookFileButton({ d, signature }: { d: Draft; signature: FormattedSig
   );
 }
 
-function mailto(d: Draft, sig: FormattedSignature | null, withBody = true) {
+/**
+ * 以郵件程式開啟：帶入收件人、副本、主旨與內文。
+ * 簽名檔由 Outlook 自動插入（Outlook 已設定的簽名檔），因此內文不放 {signature}，避免出現兩份簽名。
+ */
+function mailto(d: Draft) {
   const split = (s: string) => s.split(/[,;，；\s]+/).filter(Boolean).join(",");
-  const q = [`subject=${encodeURIComponent(d.subject)}`];
-  if (withBody) q.push(`body=${encodeURIComponent(renderBody(d, sig))}`);
+  const body = withUrl(d).split("{signature}").join("").replace(/\s+$/, "") + "\n\n";
+  const q = [`subject=${encodeURIComponent(d.subject)}`, `body=${encodeURIComponent(body)}`];
   if (d.ccRecipients) q.unshift(`cc=${encodeURIComponent(split(d.ccRecipients))}`);
   return `mailto:${split(d.toRecipients)}?${q.join("&")}`;
 }
@@ -243,12 +220,14 @@ export function EmailEditor({
             )}
             <CopyButton text={d.toRecipients} label="複製收件人" />
             <CopyButton text={d.subject} label="複製主旨" />
-            <OpenWithSignatureButton d={d} signature={signature} />
+            <Button asChild size="sm">
+              <a href={mailto(d)}>
+                <MailOpen />
+                以郵件程式開啟
+              </a>
+            </Button>
             <RichCopyButton html={buildEmailHtml(withUrl(d), signature)} text={renderBody(d, signature)} hasImage={!!signature?.html.includes("<img")} />
             <CopyButton text={() => renderBody(d, signature)} label="複製純文字" />
-            <Button asChild variant="ghost" size="sm">
-              <a href={mailto(d, signature)}>以郵件程式開啟（純文字）</a>
-            </Button>
             <OutlookFileButton d={d} signature={signature} />
             {canEdit && (d.status !== "CONFIRMED_SENT" || isAdmin) && (
               <DeleteEmailDraftButton id={d.id} schoolName={schoolName} sent={d.status === "CONFIRMED_SENT"} redirectTo="/emails" size="sm" />
@@ -287,7 +266,7 @@ export function EmailEditor({
               dangerouslySetInnerHTML={{ __html: buildEmailHtml(withUrl(d), signature) }}
             />
             <p className="text-xs text-muted-foreground">
-              按「以郵件程式開啟（含簽名檔）」會開啟 Outlook 新郵件（已填好收件人與主旨），在內文按 <strong>Ctrl+V</strong> 即貼上內文與簽名檔（含圖片與樣式）。
+              「以郵件程式開啟」會開啟 Outlook 新郵件並帶入收件人、主旨與內文，簽名檔由 Outlook 自動加上（使用你在 Outlook 設定的簽名檔）。
             </p>
           </CardContent>
         </Card>
