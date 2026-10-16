@@ -133,3 +133,35 @@ export async function previewRuleAction(taskType: TaskType, input: RuleInput) {
 export async function updateRuleAction(taskType: TaskType, input: RuleInput & { applyNow?: boolean; reason: string }) {
   return runAction(async () => updateRule(await requireAdminForAction(), taskType, input), "期限規則已更新");
 }
+
+// ── 補寄提醒信 ──
+export type ResendResult = { mode: "sent"; to: string } | { mode: "github"; email: string } | { mode: "manual"; email: string; actionsUrl: string | null };
+
+export async function resendDigestAction(userId: string) {
+  return runAction<ResendResult>(async () => {
+    const admin = await requireAdminForAction();
+    const { prisma } = await import("@/lib/db");
+    const { previewDigestForUser, resendDigestToUser } = await import("@/server/reminders/reminder-job");
+    const { canDispatchToGithub, dispatchResend, githubActionsUrl } = await import("@/server/reminders/github-dispatch");
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
+    if (!user) throw new ValidationError("找不到使用者");
+    const settings = await getEmailSettings();
+    let result: ResendResult;
+    if (settings.provider !== "console") {
+      const r = await resendDigestToUser(userId);
+      result = { mode: "sent", to: r.to };
+    } else {
+      const p = await previewDigestForUser(userId);
+      if (!p.itemCount) throw new ValidationError("今天沒有需要提醒的工作，不需補寄");
+      if (!canDispatchToGithub()) return { mode: "manual", email: user.email, actionsUrl: githubActionsUrl() };
+      try {
+        await dispatchResend(user.email);
+      } catch (e) {
+        throw new ValidationError(`無法請 GitHub 補寄：${e instanceof Error ? e.message : "未知錯誤"}`);
+      }
+      result = { mode: "github", email: user.email };
+    }
+    await writeAudit({ actorId: admin.id, action: "REMINDER_RESEND", entityType: "User", entityId: userId, summary: `補寄提醒信給 ${user.name}（${user.email}）` });
+    return result;
+  });
+}

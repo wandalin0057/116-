@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { dbDateToISO, isoToDbDate, taipeiToday, type ISODate } from "@/lib/dates";
 import { logger } from "@/lib/logger";
+import { ValidationError } from "@/server/errors";
 import { loadBusinessDayService } from "@/server/business-days/calendar-repository";
 import { getEmailSettings } from "@/server/settings/settings-service";
 import { COLLEAGUE_REMINDER_TASKS, OPEN_TASK_STATUSES } from "@/server/schedule/task-types";
@@ -290,8 +291,8 @@ export interface DigestPreview {
   note: string | null;
 }
 
-/** 預覽某位使用者今天會收到的提醒信（不寄送、不寫入紀錄） */
-export async function previewDigestForUser(userId: string, now: Date = new Date()): Promise<DigestPreview> {
+/** 組合某位使用者今天的提醒信（預覽與補寄共用，與每日排程相同的篩選與格式） */
+async function composeForUser(userId: string, now: Date) {
   const runDate = taipeiToday(now);
   const [bds, settings, user] = await Promise.all([
     loadBusinessDayService(),
@@ -313,6 +314,13 @@ export async function previewDigestForUser(userId: string, now: Date = new Date(
     originalRecipient: user.email,
     overview,
   });
+  const recipient = settings.testMode ? settings.testRecipient : user.email;
+  return { runDate, settings, user, pref, overview, count, email, recipient };
+}
+
+/** 預覽某位使用者今天會收到的提醒信（不寄送、不寫入紀錄） */
+export async function previewDigestForUser(userId: string, now: Date = new Date()): Promise<DigestPreview> {
+  const { settings, user, pref, overview, count, email } = await composeForUser(userId, now);
   const note = !user.isActive
     ? "此帳號已停用，不會收到提醒"
     : !pref.emailEnabled || (!pref.dailyDigestEnabled && !overview)
@@ -321,4 +329,38 @@ export async function previewDigestForUser(userId: string, now: Date = new Date(
         ? "今天沒有需要提醒的工作，實際上不會寄出"
         : null;
   return { to: settings.testMode ? `${settings.testRecipient}（測試模式；正式為 ${user.email}）` : user.email, subject: email.subject, html: email.html, itemCount: count, note };
+}
+
+/** 補寄：立即寄出某位使用者今天的提醒信（不受「每日僅寄一次」限制，另留寄送紀錄） */
+export async function resendDigestToUser(userId: string, options: { now?: Date; mailer?: Mailer } = {}): Promise<{ to: string }> {
+  const now = options.now ?? new Date();
+  const { runDate, settings, user, overview, count, email, recipient } = await composeForUser(userId, now);
+  if (!user.isActive) throw new ValidationError("此帳號已停用");
+  if (!count) throw new ValidationError("今天沒有需要提醒的工作，不需補寄");
+  if (settings.testMode && !recipient) throw new ValidationError("測試模式已啟用但未設定測試收件人");
+  const mailer = options.mailer ?? createMailer();
+  if (mailer.name === "console") throw new ValidationError("未設定寄信服務，無法寄出");
+  const type: NotificationType = overview ? "MANAGER_DIGEST" : "DAILY_DIGEST";
+  const log = await prisma.notificationLog.create({
+    data: {
+      userId: user.id,
+      type: `${type}_RESEND`,
+      dedupeKey: `RESEND:${type}:${user.id}:${runDate}:${now.getTime()}`,
+      digestDate: isoToDbDate(runDate),
+      recipient: recipient!,
+      subject: email.subject,
+      status: "PENDING",
+      attemptCount: 1,
+      itemCount: count,
+      isTestMode: settings.testMode,
+    },
+  });
+  try {
+    const result = await mailer.send({ to: recipient!, subject: email.subject, html: email.html, text: email.text });
+    await prisma.notificationLog.update({ where: { id: log.id }, data: { status: "SENT", sentAt: new Date(), providerMessageId: result.id ?? null } });
+  } catch (err) {
+    await prisma.notificationLog.update({ where: { id: log.id }, data: { status: "FAILED", lastError: safeError(err) } });
+    throw new ValidationError(`補寄失敗：${safeError(err)}`);
+  }
+  return { to: recipient! };
 }

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdminPage } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { previewDigestForUser } from "@/server/reminders/reminder-job";
+import { ResendDigestButton } from "@/components/settings/resend-digest-button";
 
 export const metadata = { title: "預覽提醒信" };
 
@@ -42,7 +43,10 @@ export default async function DigestPreviewPage({ searchParams }: { searchParams
           <CardHeader className="space-y-1">
             <CardTitle className="text-base">{preview.subject}</CardTitle>
             <p className="text-sm text-muted-foreground">收件人：{preview.to}</p>
-            {preview.note ? <Badge variant="warning">{preview.note}</Badge> : <Badge variant="success">共 {preview.itemCount} 項工作，明天早上 8:00 會寄出類似內容</Badge>}
+            <div className="flex flex-wrap items-center gap-3">
+              {preview.note ? <Badge variant="warning">{preview.note}</Badge> : <Badge variant="success">共 {preview.itemCount} 項工作</Badge>}
+              <ResendDigestButton userId={selected.id} name={selected.name} to={preview.to} disabled={!preview.itemCount} />
+            </div>
           </CardHeader>
           <CardContent>
             <iframe title="提醒信預覽" srcDoc={preview.html} sandbox="" className="h-[70vh] w-full rounded-md border bg-white" />

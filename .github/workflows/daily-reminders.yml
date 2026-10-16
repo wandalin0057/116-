@@ -1,5 +1,6 @@
 # 免費版每日提醒排程（GitHub Actions）
 # 每天臺灣時間 08:00（UTC 00:00）直接執行提醒程式：讀取資料庫、以 Gmail 寄信。
+# 手動執行時可填「補寄」Email，只寄該使用者今天的提醒信（網站「預覽提醒信 → 補寄」也會觸發此流程）。
 # Render 免費方案封鎖對外寄信（SMTP），因此改由此處寄送。
 #
 # 需在 GitHub 儲存庫 Settings → Secrets and variables → Actions 設定：
@@ -19,6 +20,10 @@ on:
         description: "非工作天也執行（測試用）"
         type: boolean
         default: false
+      resend_email:
+        description: "補寄：只寄給這位使用者（填 Email；留空＝寄送所有人的每日提醒）"
+        type: string
+        default: ""
 
 jobs:
   remind:
@@ -55,4 +60,5 @@ jobs:
           EMAIL_FROM: 通學區案件系統 <${{ secrets.GMAIL_ADDRESS }}>
           EMAIL_TEST_RECIPIENT: ${{ secrets.TEST_RECIPIENT }}
           COMPANY_NAME: 通學區案件系統
+          RESEND_EMAIL: ${{ inputs.resend_email }}
         run: npx tsx scripts/run-daily-reminders.ts ${{ inputs.force && '--force' || '' }}
