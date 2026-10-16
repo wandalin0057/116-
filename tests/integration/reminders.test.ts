@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/db";
 import { createCase } from "@/server/cases/case-service";
 import type { Mailer } from "@/server/reminders/mailer";
-import { runDailyReminders } from "@/server/reminders/reminder-job";
+import { previewDigestForUser, runDailyReminders } from "@/server/reminders/reminder-job";
 import { caseInput, hasTestDb, makeUser, resetDatabase, seedBasics } from "../helpers/db";
 
 function fakeMailer(fail = false): Mailer & { send: ReturnType<typeof vi.fn> } {
@@ -85,6 +85,18 @@ describe.skipIf(!hasTestDb)("12. 每日提醒排程", () => {
     expect(log.providerMessageId).not.toMatch(/^console-/);
     // 真正寄出後不再重寄
     expect((await runDailyReminders({ now: NOW, mailer })).sent).toBe(0);
+  });
+
+  it("預覽同事的提醒信：內容與實際寄送相同，但不寄出也不寫入紀錄", async () => {
+    const pm = await makeUser("pm@example.com", "ADMIN");
+    const eng = await makeUser("eng@example.com");
+    await createCase(pm, caseInput({ responsibleUserId: eng.id }));
+    const p = await previewDigestForUser(eng.id, NOW);
+    expect(p.to).toBe("eng@example.com");
+    expect(p.html).toContain("提供事前規劃報告書");
+    expect(p.html).not.toContain("創稿");
+    expect(p.note).toBeNull();
+    expect(await prisma.notificationLog.count()).toBe(0);
   });
 
   it("寄送失敗會記錄並可安全重試", async () => {

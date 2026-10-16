@@ -1,4 +1,7 @@
 import type { NotificationStatus, Prisma } from "@prisma/client";
+import { Eye } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { ListControls } from "@/components/common/list-controls";
 import { EmptyState, PageHeader } from "@/components/common/page-header";
 import { Pagination } from "@/components/common/table-nav";
@@ -48,11 +51,19 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         description="每日臺灣時間上午 8:00 由背景排程寄送工作提醒。同一使用者同一日僅寄送一次。"
         actions={
           admin ? (
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline">
+                <Link href="/notifications/preview">
+                  <Eye />
+                  預覽提醒信
+                </Link>
+              </Button>
             <RunRemindersButton
               testMode={settings.testMode}
               canSend={settings.provider !== "console"}
               actionsUrl={process.env.RENDER_GIT_REPO_SLUG ? `https://github.com/${process.env.RENDER_GIT_REPO_SLUG}/actions/workflows/daily-reminders.yml` : null}
             />
+            </div>
           ) : undefined
         }
       />

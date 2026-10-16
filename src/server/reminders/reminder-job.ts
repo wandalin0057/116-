@@ -280,3 +280,45 @@ export async function sendTestEmail(to: string, mailer: Mailer = createMailer())
     html: `<p>這是一封測試信，寄送日期 ${today}。</p><p>若您收到此信，表示 Email 設定正確。</p>`,
   });
 }
+
+export interface DigestPreview {
+  to: string;
+  subject: string;
+  html: string;
+  itemCount: number;
+  /** 不會寄送的原因（仍提供預覽內容） */
+  note: string | null;
+}
+
+/** 預覽某位使用者今天會收到的提醒信（不寄送、不寫入紀錄） */
+export async function previewDigestForUser(userId: string, now: Date = new Date()): Promise<DigestPreview> {
+  const runDate = taipeiToday(now);
+  const [bds, settings, user] = await Promise.all([
+    loadBusinessDayService(),
+    getEmailSettings(),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { reminderPreference: true } }),
+  ]);
+  const pref = user.reminderPreference ?? { emailEnabled: true, dailyDigestEnabled: true, leadBusinessDays: 3, overdueEnabled: true, managerDigestEnabled: false };
+  const overview = user.role === "ADMIN" && pref.managerDigestEnabled;
+  const tasks = overview ? await loadAllTasks() : await loadUserTasks(user);
+  const digest = buildDigest(tasks, pref, runDate, bds);
+  const count = digestCount(digest);
+  const email = renderDigestEmail({
+    recipientName: user.name,
+    recipientEmail: user.email,
+    date: runDate,
+    digest,
+    appUrl: process.env.APP_URL ?? "http://localhost:3000",
+    testMode: settings.testMode,
+    originalRecipient: user.email,
+    overview,
+  });
+  const note = !user.isActive
+    ? "此帳號已停用，不會收到提醒"
+    : !pref.emailEnabled || (!pref.dailyDigestEnabled && !overview)
+      ? "此使用者已關閉 Email 提醒，實際上不會寄出"
+      : !count
+        ? "今天沒有需要提醒的工作，實際上不會寄出"
+        : null;
+  return { to: settings.testMode ? `${settings.testRecipient}（測試模式；正式為 ${user.email}）` : user.email, subject: email.subject, html: email.html, itemCount: count, note };
+}
