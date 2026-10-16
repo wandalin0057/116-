@@ -10,6 +10,7 @@ import type { ScheduleChange } from "@/server/schedule/schedule-calculator";
 import { computeCaseScheduleChanges, syncCaseTasks } from "@/server/schedule/task-sync";
 import { randomToken } from "@/lib/crypto";
 import { hashPassword } from "@/server/auth/password";
+import { getDefaultPasswordHash } from "@/server/users/default-password";
 import { caseInputSchema, type CaseInput, type CaseParsed } from "./case-schema";
 
 type ResolvedCase = Omit<CaseParsed, "responsibleUserId"> & { responsibleUserId: string };
@@ -34,7 +35,8 @@ async function resolveResponsible(actor: AuthUser, p: CaseParsed): Promise<Resol
         email: p.responsibleEmail,
         name: p.responsibleName,
         role: "USER",
-        passwordHash: await hashPassword(randomToken(24)),
+        passwordHash: (await getDefaultPasswordHash()) ?? (await hashPassword(randomToken(24))),
+        mustChangePassword: true,
         reminderPreference: { create: {} },
       },
     });
@@ -43,7 +45,7 @@ async function resolveResponsible(actor: AuthUser, p: CaseParsed): Promise<Resol
       action: "USER_CREATE",
       entityType: "User",
       entityId: created.id,
-      summary: `由學校案件建立負責人帳號 ${created.name}（${created.email}），僅收提醒、尚未設定登入密碼`,
+      summary: `由學校案件建立負責人帳號 ${created.name}（${created.email}）`,
     });
     return { ...p, responsibleUserId: created.id };
   }

@@ -26,7 +26,7 @@ import {
 } from "@/server/users/user-service";
 
 // ── 使用者 ──
-export async function createUserAction(input: { email: string; name: string; role: "ADMIN" | "USER"; password: string }) {
+export async function createUserAction(input: { email: string; name: string; role: "ADMIN" | "USER"; password?: string }) {
   return runAction(async () => {
     await createUser(await requireAdminForAction(), input);
   }, "使用者已建立");
@@ -164,4 +164,20 @@ export async function resendDigestAction(userId: string) {
     await writeAudit({ actorId: admin.id, action: "REMINDER_RESEND", entityType: "User", entityId: userId, summary: `補寄提醒信給 ${user.name}（${user.email}）` });
     return result;
   });
+}
+
+// ── 一般使用者初始密碼 ──
+export async function setDefaultPasswordAction(password: string) {
+  return runAction(async () => {
+    const { setDefaultUserPassword } = await import("@/server/users/default-password");
+    await setDefaultUserPassword(await requireAdminForAction(), password);
+  }, "初始密碼已儲存");
+}
+
+export async function applyDefaultPasswordAction() {
+  return runAction(async () => {
+    const { applyDefaultPasswordToUsers } = await import("@/server/users/default-password");
+    const n = await applyDefaultPasswordToUsers(await requireAdminForAction());
+    return { count: n };
+  }, "已將一般使用者密碼重設為初始密碼");
 }

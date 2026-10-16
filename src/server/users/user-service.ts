@@ -9,6 +9,7 @@ import { assertAdmin } from "@/server/auth/permissions";
 import { revokeUserSessions } from "@/server/auth/session";
 import type { AuthUser } from "@/server/auth/types";
 import { NotFoundError, ValidationError } from "@/server/errors";
+import { getDefaultPasswordHash } from "./default-password";
 
 export const USER_PUBLIC_SELECT = { id: true, email: true, name: true, role: true, isActive: true, lastLoginAt: true, createdAt: true } as const;
 
@@ -24,22 +25,28 @@ const createSchema = z.object({
   email: z.string().trim().toLowerCase().email("Email 格式錯誤"),
   name: z.string().trim().min(1, "請輸入姓名").max(50),
   role: z.enum(["ADMIN", "USER"]),
-  password: z.string(),
+  /** 一般使用者可留空：改用管理員設定之初始密碼 */
+  password: z.string().optional(),
 });
 
 export async function createUser(actor: AuthUser | null, input: z.input<typeof createSchema>) {
   if (actor) assertAdmin(actor);
   const p = createSchema.safeParse(input);
   if (!p.success) throw new ValidationError(p.error.issues[0]?.message ?? "資料格式錯誤");
-  const pwErr = validatePasswordStrength(p.data.password);
-  if (pwErr) throw new ValidationError(pwErr);
+  const defaultHash = !p.data.password && p.data.role === "USER" ? await getDefaultPasswordHash() : null;
+  if (!defaultHash) {
+    if (!p.data.password) throw new ValidationError(p.data.role === "USER" ? "請輸入密碼，或先設定一般使用者初始密碼" : "管理員帳號請設定密碼");
+    const pwErr = validatePasswordStrength(p.data.password);
+    if (pwErr) throw new ValidationError(pwErr);
+  }
   if (await prisma.user.findUnique({ where: { email: p.data.email } })) throw new ValidationError("此 Email 已有帳號");
   const user = await prisma.user.create({
     data: {
       email: p.data.email,
       name: p.data.name,
       role: p.data.role as UserRole,
-      passwordHash: await hashPassword(p.data.password),
+      passwordHash: defaultHash ?? (await hashPassword(p.data.password!)),
+      mustChangePassword: !!defaultHash,
       passwordChangedAt: new Date(),
       reminderPreference: { create: {} },
     },
@@ -83,7 +90,7 @@ export async function resetUserPassword(actor: AuthUser, userId: string, newPass
   assertAdmin(actor);
   const err = validatePasswordStrength(newPassword);
   if (err) throw new ValidationError(err);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date(), failedLoginCount: 0, lockedUntil: null } });
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false, passwordChangedAt: new Date(), failedLoginCount: 0, lockedUntil: null } });
   await revokeUserSessions(userId);
   await writeAudit({ actorId: actor.id, action: "USER_PASSWORD_RESET", entityType: "User", entityId: userId, summary: "管理員重設使用者密碼" });
 }
@@ -93,7 +100,7 @@ export async function changeOwnPassword(user: AuthUser, current: string, next: s
   if (!(await verifyPassword(current, row.passwordHash))) throw new ValidationError("目前密碼不正確");
   const err = validatePasswordStrength(next);
   if (err) throw new ValidationError(err);
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), passwordChangedAt: new Date() } });
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), mustChangePassword: false, passwordChangedAt: new Date() } });
   await writeAudit({ actorId: user.id, action: "USER_PASSWORD_CHANGE", entityType: "User", entityId: user.id, summary: "使用者變更密碼" });
 }
 

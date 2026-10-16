@@ -30,6 +30,8 @@ model User {
   lockedUntil       DateTime? @db.Timestamptz
   lastLoginAt       DateTime? @db.Timestamptz
   passwordChangedAt DateTime? @db.Timestamptz
+  // 仍在使用管理員設定之初始密碼（登入後提醒變更）
+  mustChangePassword Boolean  @default(false)
   // Email 草稿結尾的簽名檔（姓名、職稱、聯絡方式）
   emailSignature    String?
   // 簽名檔圖片（data URL，已於瀏覽器端縮小，上限約 300KB）
