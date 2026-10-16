@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { ValidationError } from "@/server/errors";
 import { loadBusinessDayService } from "@/server/business-days/calendar-repository";
 import { getEmailSettings } from "@/server/settings/settings-service";
+import { resolveSiteUrl } from "@/server/settings/site-url";
 import { COLLEAGUE_REMINDER_TASKS, OPEN_TASK_STATUSES } from "@/server/schedule/task-types";
 import { createMailer, type Mailer } from "./mailer";
 import { buildDigest, digestCount, renderDigestEmail, type ReminderTask } from "./reminder-builder";
@@ -204,7 +205,7 @@ export async function runDailyReminders(options: RunOptions = {}): Promise<RunSu
       include: { reminderPreference: true },
       orderBy: { createdAt: "asc" },
     });
-    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const appUrl = await resolveSiteUrl();
     let sent = 0;
     let failed = 0;
     let skipped = 0;
@@ -309,7 +310,7 @@ async function composeForUser(userId: string, now: Date) {
     recipientEmail: user.email,
     date: runDate,
     digest,
-    appUrl: process.env.APP_URL ?? "http://localhost:3000",
+    appUrl: await resolveSiteUrl(),
     testMode: settings.testMode,
     originalRecipient: user.email,
     overview,

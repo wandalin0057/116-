@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdminPage } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { previewDigestForUser } from "@/server/reminders/reminder-job";
+import { resolveSiteUrl } from "@/server/settings/site-url";
 import { ResendDigestButton } from "@/components/settings/resend-digest-button";
 
 export const metadata = { title: "預覽提醒信" };
@@ -16,6 +17,7 @@ export default async function DigestPreviewPage({ searchParams }: { searchParams
   const users = await prisma.user.findMany({ where: { isActive: true }, orderBy: [{ role: "asc" }, { name: "asc" }], select: { id: true, name: true, email: true, role: true } });
   const selected = users.find((u) => u.id === sp.user) ?? users.find((u) => u.role === "USER") ?? users[0];
   const preview = selected ? await previewDigestForUser(selected.id) : null;
+  const siteUrl = await resolveSiteUrl();
 
   return (
     <>
@@ -43,6 +45,7 @@ export default async function DigestPreviewPage({ searchParams }: { searchParams
           <CardHeader className="space-y-1">
             <CardTitle className="text-base">{preview.subject}</CardTitle>
             <p className="text-sm text-muted-foreground">收件人：{preview.to}</p>
+            <p className="text-sm text-muted-foreground">信中連結網址：{siteUrl}</p>
             <div className="flex flex-wrap items-center gap-3">
               {preview.note ? <Badge variant="warning">{preview.note}</Badge> : <Badge variant="success">共 {preview.itemCount} 項工作</Badge>}
               <ResendDigestButton userId={selected.id} name={selected.name} to={preview.to} disabled={!preview.itemCount} />

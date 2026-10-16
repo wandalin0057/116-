@@ -117,6 +117,20 @@ describe.skipIf(!hasTestDb)("12. 每日提醒排程", () => {
     await expect(resendDigestToUser(idle.id, { now: NOW, mailer })).rejects.toThrow(/沒有需要提醒/);
   });
 
+  it("提醒信連結使用網站實際網址（優先於 APP_URL 設定）", async () => {
+    const { rememberSiteUrl } = await import("@/server/settings/site-url");
+    const pm = await makeUser("pm@example.com", "ADMIN");
+    await createCase(pm, caseInput({ responsibleUserId: pm.id }));
+    await rememberSiteUrl(new Headers({ host: "localhost:3000" }));
+    expect(await prisma.systemSetting.findUnique({ where: { key: "siteUrl" } })).toBeNull();
+    await rememberSiteUrl(new Headers({ "x-forwarded-host": "school-zone.onrender.com", "x-forwarded-proto": "https" }));
+    const mailer = fakeMailer();
+    await runDailyReminders({ now: NOW, mailer });
+    const msg = mailer.send.mock.calls[0][0];
+    expect(msg.html).toContain('href="https://school-zone.onrender.com/cases/');
+    expect(msg.html).toContain('href="https://school-zone.onrender.com/"');
+  });
+
   it("寄送失敗會記錄並可安全重試", async () => {
     const u = await makeUser("pm@example.com");
     await createCase(u, caseInput({ responsibleUserId: u.id }));
