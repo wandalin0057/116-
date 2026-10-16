@@ -33,6 +33,16 @@ async function seedRules() {
 
 /** 預設規則調整：仍為舊版預設值（未被管理員修改）者更新為新版，回傳是否有更新 */
 async function upgradeRules(): Promise<boolean> {
+  // 移除「提供圖說」工項後，創稿改以機關通知日推算（第 11 個工作天）
+  const draft = DEFAULT_DEADLINE_RULES.find((r) => r.taskType === "PRE_REPORT_DRAFT")!;
+  const reanchored = await prisma.deadlineRule.updateMany({
+    where: { taskType: "PRE_REPORT_DRAFT", anchor: "PRE_REPORT_DISPATCH", offsetBusinessDays: -1 },
+    data: { anchor: draft.anchor, offsetBusinessDays: draft.offsetBusinessDays, description: draft.description },
+  });
+  if (reanchored.count) {
+    await prisma.task.updateMany({ where: { taskType: "PRE_REPORT_DRAFT", description: "提供圖說前第 1 個工作天完成創稿" }, data: { description: draft.description } });
+    console.log("✓ 「事前規劃報告書創稿」改為機關通知日後第 11 個工作天");
+  }
   // 排序：創稿（5）→ 提供事前規劃報告書（7）→ 提供圖說（10）
   await prisma.deadlineRule.updateMany({ where: { taskType: "PRE_REPORT_PROVIDE", sortOrder: 3 }, data: { sortOrder: 7 } });
   const next = DEFAULT_DEADLINE_RULES.find((r) => r.taskType === "PRE_REPORT_PROVIDE")!;
@@ -40,7 +50,7 @@ async function upgradeRules(): Promise<boolean> {
     where: { taskType: "PRE_REPORT_PROVIDE", anchor: "PRE_REPORT_DISPATCH", offsetBusinessDays: -2 },
     data: { anchor: next.anchor, offsetBusinessDays: next.offsetBusinessDays, description: next.description },
   });
-  if (!r.count) return false;
+  if (!r.count) return reanchored.count > 0;
   await prisma.task.updateMany({
     where: { taskType: "PRE_REPORT_PROVIDE", description: "事前規劃報告書提供圖說前第 2 個工作天，由負責同事提供報告書" },
     data: { description: next.description },

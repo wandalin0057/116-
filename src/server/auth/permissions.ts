@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ForbiddenError, NotFoundError } from "@/server/errors";
 import { isAdmin, type AuthUser } from "./types";
-import { ADMIN_ONLY_TASKS } from "@/server/schedule/task-types";
+import { ADMIN_ONLY_TASKS, REMOVED_TASKS } from "@/server/schedule/task-types";
 
 /**
  * 伺服器端權限判斷。
@@ -20,7 +20,9 @@ export function caseEditWhere(user: AuthUser): Prisma.SchoolCaseWhereInput {
 }
 
 export function taskAccessWhere(user: AuthUser): Prisma.TaskWhereInput {
-  return isAdmin(user) ? {} : { schoolCase: caseAccessWhere(user), taskType: { notIn: ADMIN_ONLY_TASKS } };
+  return isAdmin(user)
+    ? { taskType: { notIn: REMOVED_TASKS } }
+    : { schoolCase: caseAccessWhere(user), taskType: { notIn: [...ADMIN_ONLY_TASKS, ...REMOVED_TASKS] } };
 }
 
 export type AccessLevel = "view" | "edit";
@@ -48,7 +50,7 @@ export async function canAccessCase(user: AuthUser, caseId: string, level: Acces
 
 export async function assertTaskAccess(user: AuthUser, taskId: string, level: AccessLevel = "view") {
   const task = await prisma.task.findUnique({ where: { id: taskId }, select: { caseId: true, taskType: true } });
-  if (!task || (!isAdmin(user) && ADMIN_ONLY_TASKS.includes(task.taskType))) throw new NotFoundError("找不到此工作");
+  if (!task || REMOVED_TASKS.includes(task.taskType) || (!isAdmin(user) && ADMIN_ONLY_TASKS.includes(task.taskType))) throw new NotFoundError("找不到此工作");
   await assertCaseAccess(user, task.caseId, level);
   return task;
 }

@@ -65,15 +65,14 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
 
     await markDocumentDrafted(u, doc.id);
     const draftTask = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DRAFT" } });
-    const dispatchTask = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DISPATCH" } });
     expect(draftTask.status).toBe("COMPLETED");
-    expect(dispatchTask.status).toBe("NOT_STARTED");
+    // 事前規劃報告書已不另列「提供圖說」工項
+    expect(await prisma.task.count({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DISPATCH" } })).toBe(0);
 
     await expect(markDocumentDispatched(u, doc.id, { documentNumber: "", dispatchDate: "2026-11-02" })).rejects.toThrow(/發文字號/);
     await markDocumentDispatched(u, doc.id, { documentNumber: "交顧字第1150001號", dispatchDate: "2026-11-02" });
     const after = await prisma.officialDocument.findUniqueOrThrow({ where: { id: doc.id } });
     expect(after.documentNumber).toBe("交顧字第1150001號");
-    expect((await prisma.task.findUniqueOrThrow({ where: { id: dispatchTask.id } })).status).toBe("COMPLETED");
     await expect(updateDocument(u, doc.id, { subject: "x", body: "y" })).rejects.toThrow(/不可修改/);
   });
 

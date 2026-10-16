@@ -13,11 +13,12 @@ describe("期程自動計算", () => {
     bds,
   );
 
-  it("5. 機關通知後第 12 工作天發文掛件", () => {
-    expect(due(schedule, "PRE_REPORT_DISPATCH")).toBe("2026-11-02");
+  it("5. 機關通知後第 12 工作天提供事前規劃報告書；不再產生「提供圖說」工項", () => {
+    expect(due(schedule, "PRE_REPORT_PROVIDE")).toBe("2026-11-02");
+    expect(schedule.some((c) => c.taskType === "PRE_REPORT_DISPATCH")).toBe(false);
   });
 
-  it("9. 發文前 1 工作天建立創稿工作（週一發文 → 上週五創稿）", () => {
+  it("9. 機關通知後第 11 工作天完成創稿", () => {
     expect(due(schedule, "PRE_REPORT_DRAFT")).toBe("2026-10-30");
   });
 
@@ -39,13 +40,16 @@ describe("期程自動計算", () => {
 
   it("日期可分次填寫：未填之事件不產生期限", () => {
     const partial = calculateSchedule({ notificationDate: "2026-10-14", reviewMeetingDate: null, siteVisitDate: null }, DEFAULT_DEADLINE_RULES, bds);
-    expect(due(partial, "PRE_REPORT_DISPATCH")).toBe("2026-11-02");
+    expect(due(partial, "PRE_REPORT_PROVIDE")).toBe("2026-11-02");
     expect(due(partial, "REVIEW_MEETING")).toBeNull();
     expect(due(partial, "SITE_VISIT")).toBeNull();
   });
 
-  it("發文日人工鎖定時，創稿期限以鎖定日為基準", () => {
-    const s = calculateSchedule({ notificationDate: "2026-10-14", reviewMeetingDate: null, siteVisitDate: null }, DEFAULT_DEADLINE_RULES, bds, {
+  it("依附其他工作之規則：上游人工鎖定時以鎖定日為基準", () => {
+    const rules = DEFAULT_DEADLINE_RULES.map((r) =>
+      r.taskType === "PRE_REPORT_DISPATCH" ? { ...r, enabled: true } : r.taskType === "PRE_REPORT_DRAFT" ? { ...r, anchor: "PRE_REPORT_DISPATCH" as const, offsetBusinessDays: -1 } : r,
+    );
+    const s = calculateSchedule({ notificationDate: "2026-10-14", reviewMeetingDate: null, siteVisitDate: null }, rules, bds, {
       effectiveDueDates: { PRE_REPORT_DISPATCH: "2026-11-10" },
     });
     expect(due(s, "PRE_REPORT_DRAFT")).toBe("2026-11-09");

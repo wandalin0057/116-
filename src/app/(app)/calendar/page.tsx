@@ -24,7 +24,8 @@ import {
 import { cn } from "@/lib/utils";
 import { caseAccessWhere } from "@/server/auth/permissions";
 import { getCalendarEvents, type CalendarEvent } from "@/server/calendar/calendar-view-service";
-import { TASK_COLORS, TASK_TYPE_LABELS } from "@/server/schedule/task-types";
+import type { TaskType } from "@prisma/client";
+import { ADMIN_ONLY_TASKS, REMOVED_TASKS, TASK_COLORS, TASK_TYPE_LABELS } from "@/server/schedule/task-types";
 import { listUsers } from "@/server/users/user-service";
 import { listProjectNames } from "@/server/cases/projects";
 
@@ -150,7 +151,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
               { name: "project", label: "計畫", allLabel: "全部計畫", options: projects.map((p) => ({ value: p, label: p })) },
               { name: "caseId", label: "學校", options: cases.map((c) => ({ value: c.id, label: c.schoolName })) },
               { name: "assignee", label: "承辦人", options: users.map((u) => ({ value: u.id, label: u.name })) },
-              { name: "taskType", label: "工作類型", options: Object.entries(TASK_TYPE_LABELS).map(([value, label]) => ({ value, label })) },
+              { name: "taskType", label: "工作類型", options: Object.entries(TASK_TYPE_LABELS)
+                  .filter(([value]) => !REMOVED_TASKS.includes(value as TaskType) && (user.role === "ADMIN" || !ADMIN_ONLY_TASKS.includes(value as TaskType)))
+                  .map(([value, label]) => ({ value, label })) },
             ]}
           />
           <div className="flex flex-wrap gap-3 text-xs">

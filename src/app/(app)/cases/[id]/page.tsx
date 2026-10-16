@@ -22,7 +22,7 @@ import { DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS } from "@/server/documents
 import { EMAIL_DRAFT_STATUS_LABELS } from "@/server/emails/email-draft-service";
 import { TEMPLATE_TYPE_LABELS } from "@/server/templates/default-templates";
 import { computeDueInfo } from "@/server/tasks/task-utils";
-import { ADMIN_ONLY_TASKS, TASK_TIMELINE_ORDER } from "@/server/schedule/task-types";
+import { ADMIN_ONLY_TASKS, REMOVED_TASKS, TASK_TIMELINE_ORDER } from "@/server/schedule/task-types";
 import { listUsers } from "@/server/users/user-service";
 
 const EVENT_STATUS = { SCHEDULED: "已排定", RESCHEDULED: "已改期", HELD: "已辦理", CANCELLED: "已取消" } as const;
@@ -44,7 +44,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const today = taipeiToday();
   const order: string[] = TASK_TIMELINE_ORDER;
   // 創稿工作僅管理員可見
-  const visibleTasks = isAdmin(user) ? c.tasks : c.tasks.filter((t) => !ADMIN_ONLY_TASKS.includes(t.taskType));
+  const visibleTasks = c.tasks.filter((t) => !REMOVED_TASKS.includes(t.taskType) && (isAdmin(user) || !ADMIN_ONLY_TASKS.includes(t.taskType)));
   const tasks = [...visibleTasks].sort((a, b) => order.indexOf(a.taskType) - order.indexOf(b.taskType)).map((t) => ({ ...t, due: computeDueInfo(t, bds, today) }));
   const histories = visibleTasks
     .flatMap((t) => t.histories.map((h) => ({ ...h, taskTitle: t.title })))

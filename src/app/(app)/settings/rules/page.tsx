@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { requireAdminPage } from "@/lib/auth";
 import { ANCHOR_LABELS } from "@/server/schedule/task-types";
+import { REMOVED_TASKS } from "@/server/schedule/task-types";
 import { loadDeadlineRules } from "@/server/schedule/task-sync";
 
 export const metadata = { title: "期限規則管理" };
@@ -17,7 +18,8 @@ function offsetText(n: number) {
 
 export default async function RulesPage() {
   await requireAdminPage();
-  const rules = await loadDeadlineRules();
+  // 已移除之工項不列出
+  const rules = (await loadDeadlineRules()).filter((r) => !REMOVED_TASKS.includes(r.taskType));
   return (
     <>
       <PageHeader title="期限規則管理" description="修改規則需管理員權限，並記錄原因。事件當日為 D0，不計入前後工作天。" />
