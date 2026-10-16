@@ -130,18 +130,26 @@ async function claimNotification(args: {
   }
   // 已存在：僅失敗或中斷之紀錄可重試（以條件式更新確保只有一個程序取得）
   const existing = await prisma.notificationLog.findUnique({ where: { dedupeKey: args.dedupeKey } });
-  if (!existing || existing.status === "SENT" || existing.status === "SKIPPED") return null;
+  // 以 console（未設定寄信服務）模擬寄出者並未真正寄出，可由正式寄信程序重新寄送
+  const simulated = existing?.status === "SENT" && isSimulatedId(existing.providerMessageId);
+  if (!existing || ((existing.status === "SENT" || existing.status === "SKIPPED") && !simulated)) return null;
   if (existing.attemptCount >= MAX_ATTEMPTS) return null;
   const staleBefore = new Date(Date.now() - STALE_PENDING_MS);
   const claimed = await prisma.notificationLog.updateMany({
     where: {
       id: existing.id,
       attemptCount: existing.attemptCount,
-      OR: [{ status: "FAILED" }, { status: "PENDING", updatedAt: { lt: staleBefore } }],
+      OR: [
+        { status: "FAILED" },
+        { status: "PENDING", updatedAt: { lt: staleBefore } },
+        { status: "SENT", providerMessageId: { startsWith: SIMULATED_PREFIX } },
+      ],
     },
     data: {
       status: "PENDING",
       attemptCount: { increment: 1 },
+      providerMessageId: null,
+      sentAt: null,
       recipient: args.recipient,
       subject: args.subject,
       itemCount: args.itemCount,
@@ -152,6 +160,9 @@ async function claimNotification(args: {
   });
   return claimed.count ? existing.id : null;
 }
+
+const SIMULATED_PREFIX = "console-";
+const isSimulatedId = (id: string | null | undefined) => !!id?.startsWith(SIMULATED_PREFIX);
 
 function safeError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -183,6 +194,10 @@ export async function runDailyReminders(options: RunOptions = {}): Promise<RunSu
       return await finish("FAILED", 0, 0, 0, "測試模式已啟用但未設定測試收件人");
     }
     const mailer = options.mailer ?? createMailer();
+    if (mailer.name === "console") {
+      // 未設定寄信服務：不建立寄送紀錄，避免之後正式寄信時被誤判為「今日已寄出」
+      return await finish("FAILED", 0, 0, 0, "未設定寄信服務（EMAIL_PROVIDER=console），未實際寄出任何提醒");
+    }
     const users = await prisma.user.findMany({
       where: { isActive: true, ...(options.userIds ? { id: { in: options.userIds } } : {}) },
       include: { reminderPreference: true },

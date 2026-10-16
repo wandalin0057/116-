@@ -46,7 +46,15 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       <PageHeader
         title="提醒紀錄"
         description="每日臺灣時間上午 8:00 由背景排程寄送工作提醒。同一使用者同一日僅寄送一次。"
-        actions={admin ? <RunRemindersButton testMode={settings.testMode} /> : undefined}
+        actions={
+          admin ? (
+            <RunRemindersButton
+              testMode={settings.testMode}
+              canSend={settings.provider !== "console"}
+              actionsUrl={process.env.RENDER_GIT_REPO_SLUG ? `https://github.com/${process.env.RENDER_GIT_REPO_SLUG}/actions/workflows/daily-reminders.yml` : null}
+            />
+          ) : undefined
+        }
       />
       {settings.testMode && (
         <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -134,7 +142,11 @@ export default async function NotificationsPage({ searchParams }: { searchParams
                     </TD>
                     <TD className="tabular">{l.itemCount}</TD>
                     <TD>
-                      <Badge variant={STATUS[l.status].variant}>{STATUS[l.status].label}</Badge>
+                      {l.status === "SENT" && l.providerMessageId?.startsWith("console-") ? (
+                        <Badge variant="warning" title="網站未設定寄信服務，只模擬寄送；正式排程會重新寄出">未實際寄出</Badge>
+                      ) : (
+                        <Badge variant={STATUS[l.status].variant}>{STATUS[l.status].label}</Badge>
+                      )}
                       {l.lastError && <p className="mt-0.5 max-w-xs truncate text-xs text-red-700" title={l.lastError}>{l.lastError}</p>}
                     </TD>
                     <TD className="tabular">{l.attemptCount}</TD>

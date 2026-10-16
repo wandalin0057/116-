@@ -72,6 +72,12 @@ export async function sendTestEmailAction(to: string) {
 export async function runRemindersNowAction(force: boolean) {
   return runAction(async () => {
     const admin = await requireAdminForAction();
+    const settings = await getEmailSettings();
+    if (settings.provider === "console") {
+      throw new ValidationError(
+        "網站目前無法直接寄信（Render 免費方案封鎖寄信）。請到 GitHub 的 Actions →「每日提醒」→「Run workflow」手動執行，信件會由 Gmail 寄出。",
+      );
+    }
     const summary = await runDailyReminders({ trigger: "MANUAL", force });
     await writeAudit({ actorId: admin.id, action: "REMINDER_RUN_MANUAL", entityType: "JobRun", entityId: summary.jobRunId, summary: `手動執行每日提醒：${summary.message}` });
     return summary;

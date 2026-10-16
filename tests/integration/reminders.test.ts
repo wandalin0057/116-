@@ -63,6 +63,30 @@ describe.skipIf(!hasTestDb)("12. 每日提醒排程", () => {
     expect(pmText).toContain("｜提供審查簡報｜");
   });
 
+  it("網站未設定寄信服務時不會標記為已寄出；先前模擬寄出的紀錄仍會由正式排程補寄", async () => {
+    const pm = await makeUser("pm@example.com", "ADMIN");
+    await createCase(pm, caseInput({ responsibleUserId: pm.id }));
+    const consoleMailer: Mailer = { name: "console", send: vi.fn(async () => ({ id: "console-1" })) };
+    const r0 = await runDailyReminders({ now: NOW, mailer: consoleMailer });
+    expect(r0.status).toBe("FAILED");
+    expect(r0.message).toMatch(/未設定寄信服務/);
+    expect(await prisma.notificationLog.count()).toBe(0);
+
+    // 舊版留下的「模擬寄出」紀錄
+    await prisma.notificationLog.create({
+      data: { userId: pm.id, type: "DAILY_DIGEST", dedupeKey: `DAILY_DIGEST:${pm.id}:2026-10-30`, digestDate: new Date("2026-10-30"), recipient: pm.email, subject: "x", status: "SENT", attemptCount: 1, providerMessageId: "console-123", sentAt: new Date() },
+    });
+    const mailer = fakeMailer();
+    const r1 = await runDailyReminders({ now: NOW, mailer });
+    expect(r1.sent).toBe(1);
+    expect(mailer.send).toHaveBeenCalledTimes(1);
+    const log = await prisma.notificationLog.findFirstOrThrow();
+    expect(log).toMatchObject({ status: "SENT", attemptCount: 2 });
+    expect(log.providerMessageId).not.toMatch(/^console-/);
+    // 真正寄出後不再重寄
+    expect((await runDailyReminders({ now: NOW, mailer })).sent).toBe(0);
+  });
+
   it("寄送失敗會記錄並可安全重試", async () => {
     const u = await makeUser("pm@example.com");
     await createCase(u, caseInput({ responsibleUserId: u.id }));
