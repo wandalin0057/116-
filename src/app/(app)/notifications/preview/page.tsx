@@ -45,14 +45,20 @@ export default async function DigestPreviewPage({ searchParams }: { searchParams
           <CardHeader className="space-y-1">
             <CardTitle className="text-base">{preview.subject}</CardTitle>
             <p className="text-sm text-muted-foreground">收件人：{preview.to}</p>
-            <p className="text-sm text-muted-foreground">信中連結網址：{siteUrl}</p>
+            <p className="text-sm text-muted-foreground">信中連結網址：{siteUrl}（在預覽中點連結會開新分頁）</p>
             <div className="flex flex-wrap items-center gap-3">
               {preview.note ? <Badge variant="warning">{preview.note}</Badge> : <Badge variant="success">共 {preview.itemCount} 項工作</Badge>}
               <ResendDigestButton userId={selected.id} name={selected.name} to={preview.to} disabled={!preview.itemCount} />
             </div>
           </CardHeader>
           <CardContent>
-            <iframe title="提醒信預覽" srcDoc={preview.html} sandbox="" className="h-[70vh] w-full rounded-md border bg-white" />
+            {/* 信中連結一律開新分頁（網站禁止被嵌入框架，直接在框內開啟會顯示「拒絕連線」） */}
+            <iframe
+              title="提醒信預覽"
+              srcDoc={`<base target="_blank">${preview.html}`}
+              sandbox="allow-popups allow-popups-to-escape-sandbox"
+              className="h-[70vh] w-full rounded-md border bg-white"
+            />
           </CardContent>
         </Card>
       )}
