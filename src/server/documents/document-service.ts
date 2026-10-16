@@ -13,6 +13,7 @@ import { renderTemplate } from "@/server/templates/template-renderer";
 import { getActiveTemplate } from "@/server/templates/template-service";
 import { buildDocumentVariables, splitBodyLines } from "./document-variables";
 import { getOrganization } from "@/server/settings/settings-service";
+import { defaultAttachmentPassword, downloadDeadlineFor } from "./attachment-defaults";
 
 const DRAFT_TASK: Record<DocumentType, TaskType> = {
   PRE_REPORT: "PRE_REPORT_DRAFT",
@@ -41,8 +42,13 @@ export async function createDocumentDraft(user: AuthUser, input: { caseId: strin
     input.taskId ??
     (await prisma.task.findUnique({ where: { caseId_taskType: { caseId: input.caseId, taskType: DISPATCH_TASK[input.documentType] } }, select: { id: true } }))?.id ??
     null;
+  // 預設下載密碼（CD80@＋提供報告／圖面日期）與下載期限（創稿日期＋14 天）
+  const today = taipeiToday();
+  const pw = await defaultAttachmentPassword(input.caseId, input.documentType);
   const doc = await prisma.officialDocument.create({
     data: {
+      attachmentPasswordEnc: pw ? encryptSecret(pw.password) : null,
+      downloadDeadline: isoToDbDate(downloadDeadlineFor(today)),
       caseId: input.caseId,
       taskId,
       templateId: template.id,
@@ -53,7 +59,7 @@ export async function createDocumentDraft(user: AuthUser, input: { caseId: strin
       attachments: "",
       subject,
       body,
-      draftDate: isoToDbDate(taipeiToday()),
+      draftDate: isoToDbDate(today),
       createdById: user.id,
     },
   });

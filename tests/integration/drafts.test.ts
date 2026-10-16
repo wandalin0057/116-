@@ -76,6 +76,18 @@ describe.skipIf(!hasTestDb)("公文與 Email 草稿", () => {
     await expect(updateDocument(u, doc.id, { subject: "x", body: "y" })).rejects.toThrow(/不可修改/);
   });
 
+  it("新公文自動帶入下載密碼（CD80@＋提供報告日期）與下載期限（創稿日＋14 天）", async () => {
+    const { taipeiToday, addCalendarDays, dbDateToISO } = await import("@/lib/dates");
+    const u = await makeUser("pm@example.com", "ADMIN");
+    const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));
+    const provide = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_PROVIDE" } });
+    const d = dbDateToISO(provide.calculatedDueDate!);
+    const doc = await createDocumentDraft(u, { caseId: schoolCase.id, documentType: "PRE_REPORT" });
+    const full = await getDocumentForEdit(u, doc.id);
+    expect(full.attachmentPassword).toBe(`CD80@${d.slice(5, 7)}${d.slice(8, 10)}`);
+    expect(dbDateToISO(full.downloadDeadline!)).toBe(addCalendarDays(taipeiToday(), 14));
+  });
+
   it("操作紀錄不包含下載密碼", async () => {
     const u = await makeUser("pm@example.com");
     const { schoolCase } = await createCase(u, caseInput({ responsibleUserId: u.id }));

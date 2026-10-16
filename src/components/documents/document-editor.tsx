@@ -43,6 +43,14 @@ interface DocState {
 
 const KEEP = ["attachmentPassword", "attachmentUrl", "downloadDeadlineROC"];
 
+/** YYYY-MM-DD ＋ n 天 */
+function plusDays(date: string, n: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "";
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 export function DocumentEditor({
   doc: initial,
   canEdit,
@@ -52,7 +60,9 @@ export function DocumentEditor({
   organization,
   schoolName,
   isAdmin = false,
+  defaults = { password: null, passwordSource: null },
 }: {
+  defaults?: { password: string | null; passwordSource: string | null };
   doc: DocState;
   canEdit: boolean;
   template: { subject: string; body: string };
@@ -186,8 +196,43 @@ export function DocumentEditor({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="draftDate">創稿日期</Label>
-                <Input id="draftDate" type="date" value={d.draftDate} onChange={set("draftDate")} disabled={locked} />
+                <Input
+                  id="draftDate"
+                  type="date"
+                  value={d.draftDate}
+                  disabled={locked}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    // 下載期限仍為「創稿日期＋14 天」時跟著創稿日期調整
+                    setD((s) => ({ ...s, draftDate: v, downloadDeadline: v && (!s.downloadDeadline || s.downloadDeadline === plusDays(s.draftDate, 14)) ? plusDays(v, 14) : s.downloadDeadline }));
+                  }}
+                />
               </div>
+              {!locked && (
+                <div className="space-y-1 text-xs text-muted-foreground sm:col-span-3">
+                  <p>
+                    預設下載密碼：{defaults.password ? <code className="rounded bg-slate-100 px-1">{defaults.password}</code> : "（尚無提供日期）"}
+                    {defaults.passwordSource && `（依「${defaults.passwordSource}」）`}；預設下載期限：創稿日期＋14 天
+                    {d.draftDate && `（${plusDays(d.draftDate, 14)}）`}
+                  </p>
+                  {((defaults.password && d.attachmentPassword !== defaults.password) || (d.draftDate && d.downloadDeadline !== plusDays(d.draftDate, 14))) && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() =>
+                        setD((s) => ({
+                          ...s,
+                          attachmentPassword: defaults.password ?? s.attachmentPassword,
+                          downloadDeadline: s.draftDate ? plusDays(s.draftDate, 14) : s.downloadDeadline,
+                        }))
+                      }
+                    >
+                      帶入預設密碼與下載期限
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">

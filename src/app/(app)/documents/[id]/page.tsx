@@ -4,7 +4,8 @@ import { DocumentEditor } from "@/components/documents/document-editor";
 import { PageHeader } from "@/components/common/page-header";
 import { Badge } from "@/components/ui/badge";
 import { requireUser } from "@/lib/auth";
-import { dbDateToISOOrNull, formatROCDateTime } from "@/lib/dates";
+import { dbDateToISOOrNull, formatROC, formatROCDateTime } from "@/lib/dates";
+import { defaultAttachmentPassword } from "@/server/documents/attachment-defaults";
 import { canAccessCase } from "@/server/auth/permissions";
 import { getDocumentForEdit } from "@/server/documents/document-service";
 import { buildDocumentVariables, DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS } from "@/server/documents/document-variables";
@@ -24,6 +25,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   const [canEdit, template] = await Promise.all([canAccessCase(user, doc.caseId, "edit"), getActiveTemplate(doc.documentType)]);
   const org = await getOrganization();
   const baseVars = buildDocumentVariables({ schoolCase: doc.schoolCase, companyName: org.companyName });
+  const pwDefault = await defaultAttachmentPassword(doc.caseId, doc.documentType);
   return (
     <>
       <PageHeader
@@ -46,6 +48,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
         organization={{ address: org.address, contactName: org.contactName, phone: org.phone, fax: org.fax, email: org.email }}
         schoolName={doc.schoolCase.schoolName}
         isAdmin={user.role === "ADMIN"}
+        defaults={{ password: pwDefault?.password ?? null, passwordSource: pwDefault ? `${pwDefault.source} ${formatROC(pwDefault.date)}` : null }}
         template={{ subject: template.subject, body: template.body }}
         baseVars={baseVars as Record<string, string>}
         doc={{
