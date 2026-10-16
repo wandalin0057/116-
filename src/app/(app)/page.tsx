@@ -13,6 +13,7 @@ import { requireUser } from "@/lib/auth";
 import { formatROC, formatROCDateTime, formatROCShort, weekdayZh } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { getDashboard, type DashboardTask } from "@/server/dashboard/dashboard-service";
+import { ADMIN_ONLY_TASKS, TASK_TIMELINE_ORDER, TASK_TYPE_LABELS } from "@/server/schedule/task-types";
 import { CASE_STATUS_LABELS } from "@/server/cases/case-schema";
 
 export const metadata = { title: "儀表板" };
@@ -45,6 +46,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const mineOnly = sp.mine === "1";
   const [d, projects] = await Promise.all([getDashboard(user, { mineOnly, projectName: sp.project || undefined }), listProjectNames(user)]);
+  const visibleTypes = TASK_TIMELINE_ORDER.filter((t) => user.role === "ADMIN" || !ADMIN_ONLY_TASKS.includes(t));
 
   return (
     <>
@@ -126,25 +128,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <CardTitle>待辦分類</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue={user.role === "ADMIN" ? "draft" : "dispatch"}>
-            <TabsList>
-              {user.role === "ADMIN" && <TabsTrigger value="draft">待創稿（{d.pendingDraft.length}）</TabsTrigger>}
-              <TabsTrigger value="dispatch">待提供圖說（{d.pendingDispatch.length}）</TabsTrigger>
-              <TabsTrigger value="email">待寄送 Email（{d.pendingEmail.length}）</TabsTrigger>
-              <TabsTrigger value="upload">待上傳簡報（{d.pendingUpload.length}）</TabsTrigger>
+          {/* 依作業流程順序列出每項工作；各分頁內依截止日期排序 */}
+          <Tabs defaultValue={visibleTypes[0]}>
+            <TabsList className="h-auto flex-wrap justify-start">
+              {visibleTypes.map((type) => (
+                <TabsTrigger key={type} value={type}>
+                  {TASK_TYPE_LABELS[type]}（{d.pendingByType[type].length}）
+                </TabsTrigger>
+              ))}
             </TabsList>
-            <TabsContent value="draft">
-              <TaskList tasks={d.pendingDraft} empty="沒有待創稿工作" />
-            </TabsContent>
-            <TabsContent value="dispatch">
-              <TaskList tasks={d.pendingDispatch} empty="沒有待提供圖說工作" />
-            </TabsContent>
-            <TabsContent value="email">
-              <TaskList tasks={d.pendingEmail} empty="沒有待寄送 Email" />
-            </TabsContent>
-            <TabsContent value="upload">
-              <TaskList tasks={d.pendingUpload} empty="沒有待上傳簡報" />
-            </TabsContent>
+            {visibleTypes.map((type) => (
+              <TabsContent key={type} value={type}>
+                <TaskList tasks={d.pendingByType[type]} empty={`沒有待辦的「${TASK_TYPE_LABELS[type]}」`} />
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>

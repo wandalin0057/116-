@@ -20,7 +20,7 @@ export const DEFAULT_DEADLINE_RULES: DeadlineRuleDef[] = [
     anchor: "NOTIFICATION_DATE",
     offsetBusinessDays: 12,
     enabled: true,
-    sortOrder: 3,
+    sortOrder: 7,
   },
   {
     taskType: "PRE_REPORT_DISPATCH",

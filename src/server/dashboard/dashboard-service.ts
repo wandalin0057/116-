@@ -1,3 +1,4 @@
+import type { TaskType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { addCalendarDays, startOfWeekMonday, taipeiToday, parseTaipeiDateTime, type ISODate } from "@/lib/dates";
@@ -6,6 +7,7 @@ import type { AuthUser } from "@/server/auth/types";
 import { loadBusinessDayService } from "@/server/business-days/calendar-repository";
 import { TASK_CATEGORY, type TaskCategory } from "@/server/schedule/task-types";
 import { OPEN_WHERE, TASK_INCLUDE } from "@/server/tasks/task-service";
+import { TASK_TIMELINE_ORDER } from "@/server/schedule/task-types";
 import { computeDueInfo, type DueInfo } from "@/server/tasks/task-utils";
 
 export type DashboardTask = Prisma.TaskGetPayload<{ include: typeof TASK_INCLUDE }> & { due: DueInfo; category: TaskCategory };
@@ -101,6 +103,8 @@ export async function getDashboard(user: AuthUser, opts: { mineOnly?: boolean; n
     pendingDispatch: pending("DISPATCH"),
     pendingEmail: pending("EMAIL"),
     pendingUpload: pending("UPLOAD"),
+    /** 依工作類型分組（已依截止日期排序） */
+    pendingByType: Object.fromEntries(TASK_TIMELINE_ORDER.map((type) => [type, withDue.filter((t) => t.taskType === type)])) as Record<TaskType, DashboardTask[]>,
     weekMeetings,
     weekSiteVisits,
     progress,

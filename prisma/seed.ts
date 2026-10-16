@@ -33,6 +33,8 @@ async function seedRules() {
 
 /** 預設規則調整：仍為舊版預設值（未被管理員修改）者更新為新版，回傳是否有更新 */
 async function upgradeRules(): Promise<boolean> {
+  // 排序：創稿（5）→ 提供事前規劃報告書（7）→ 提供圖說（10）
+  await prisma.deadlineRule.updateMany({ where: { taskType: "PRE_REPORT_PROVIDE", sortOrder: 3 }, data: { sortOrder: 7 } });
   const next = DEFAULT_DEADLINE_RULES.find((r) => r.taskType === "PRE_REPORT_PROVIDE")!;
   const r = await prisma.deadlineRule.updateMany({
     where: { taskType: "PRE_REPORT_PROVIDE", anchor: "PRE_REPORT_DISPATCH", offsetBusinessDays: -2 },
