@@ -22,6 +22,7 @@ import { DOCUMENT_STATUS_LABELS, DOCUMENT_TYPE_LABELS } from "@/server/documents
 import { EMAIL_DRAFT_STATUS_LABELS } from "@/server/emails/email-draft-service";
 import { TEMPLATE_TYPE_LABELS } from "@/server/templates/default-templates";
 import { computeDueInfo } from "@/server/tasks/task-utils";
+import { ADMIN_ONLY_TASKS } from "@/server/schedule/task-types";
 import { listUsers } from "@/server/users/user-service";
 
 const EVENT_STATUS = { SCHEDULED: "已排定", RESCHEDULED: "已改期", HELD: "已辦理", CANCELLED: "已取消" } as const;
@@ -42,8 +43,10 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
   const [c, bds, users, canEdit] = await Promise.all([getCaseDetail(user, id), loadBusinessDayService(), listUsers(), canAccessCase(user, id, "edit")]);
   const today = taipeiToday();
   const order = ["PRE_REPORT_PROVIDE", "PRE_REPORT_DRAFT", "PRE_REPORT_DISPATCH", "REVIEW_SLIDES_EMAIL", "REVIEW_MEETING", "REVIEW_MINUTES_EMAIL", "REVIEW_DRAWING_DRAFT", "REVIEW_DRAWING_DISPATCH", "SITE_VISIT_SLIDES_UPLOAD", "SITE_VISIT", "SITE_VISIT_MINUTES_EMAIL", "SITE_VISIT_DRAWING_DRAFT", "SITE_VISIT_DRAWING_DISPATCH"];
-  const tasks = [...c.tasks].sort((a, b) => order.indexOf(a.taskType) - order.indexOf(b.taskType)).map((t) => ({ ...t, due: computeDueInfo(t, bds, today) }));
-  const histories = c.tasks
+  // 創稿工作僅管理員可見
+  const visibleTasks = isAdmin(user) ? c.tasks : c.tasks.filter((t) => !ADMIN_ONLY_TASKS.includes(t.taskType));
+  const tasks = [...visibleTasks].sort((a, b) => order.indexOf(a.taskType) - order.indexOf(b.taskType)).map((t) => ({ ...t, due: computeDueInfo(t, bds, today) }));
+  const histories = visibleTasks
     .flatMap((t) => t.histories.map((h) => ({ ...h, taskTitle: t.title })))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 15);
@@ -82,7 +85,7 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
                 caseId={c.id}
                 schoolName={c.schoolName}
                 projectCode={c.projectCode}
-                counts={{ tasks: c.tasks.length, documents: c.documents.length, emails: c.emailDrafts.length }}
+                counts={{ tasks: visibleTasks.length, documents: c.documents.length, emails: c.emailDrafts.length }}
                 redirectTo="/cases"
                 size="default"
               />

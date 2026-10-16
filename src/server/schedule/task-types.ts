@@ -89,5 +89,8 @@ export const COLLEAGUE_REMINDER_TASKS: TaskType[] = [
   "REVIEW_DRAWING_DISPATCH",
 ];
 
+/** 只顯示給管理員（專案經理）的工作：各項創稿；一般使用者的工作清單、儀表板、行事曆與案件頁不顯示 */
+export const ADMIN_ONLY_TASKS: TaskType[] = ["PRE_REPORT_DRAFT", "REVIEW_DRAWING_DRAFT", "SITE_VISIT_DRAWING_DRAFT"];
+
 export const OPEN_TASK_STATUSES: TaskStatus[] = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD"];
 export const CLOSED_TASK_STATUSES: TaskStatus[] = ["COMPLETED", "CANCELLED"];

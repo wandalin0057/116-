@@ -134,6 +134,25 @@ describe.skipIf(!hasTestDb)("案件期程同步（資料庫）", () => {
     expect(task.title).toBe("提供事前規劃及分析報告書圖說");
   });
 
+  it("創稿工作只顯示給管理員：一般使用者的工作清單、儀表板與行事曆不包含創稿", async () => {
+    const { listTasks, getTask } = await import("@/server/tasks/task-service");
+    const { getDashboard } = await import("@/server/dashboard/dashboard-service");
+    const admin = await makeUser("pm@example.com", "ADMIN");
+    const eng = await makeUser("eng@example.com");
+    const { schoolCase } = await createCase(admin, caseInput({ responsibleUserId: eng.id }));
+    const engTasks = await listTasks(eng, { pageSize: 100 });
+    const adminTasks = await listTasks(admin, { pageSize: 100 });
+    const types = (r: { items: { taskType: string }[] }) => r.items.map((t) => t.taskType);
+    expect(types(engTasks).some((t) => t.endsWith("_DRAFT"))).toBe(false);
+    expect(types(adminTasks)).toContain("PRE_REPORT_DRAFT");
+    expect(types(engTasks)).toContain("PRE_REPORT_PROVIDE");
+    const draft = await prisma.task.findFirstOrThrow({ where: { caseId: schoolCase.id, taskType: "PRE_REPORT_DRAFT" } });
+    await expect(getTask(eng, draft.id)).rejects.toThrow(/找不到/);
+    await expect(getTask(admin, draft.id)).resolves.toBeTruthy();
+    const dash = await getDashboard(eng, {});
+    expect(dash.pendingDraft).toHaveLength(0);
+  });
+
   it("一般使用者不能以新 Email 自動建立帳號；未填負責人 Email 時提示", async () => {
     const u = await makeUser("user@example.com");
     await expect(createCase(u, caseInput({ responsibleName: "新人", responsibleEmail: "new@example.com" }))).rejects.toThrow(/尚未建立帳號/);

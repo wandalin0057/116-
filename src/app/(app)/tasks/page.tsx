@@ -8,7 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { requireUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { TASK_COLORS, TASK_STATUS_LABELS, TASK_TYPE_LABELS } from "@/server/schedule/task-types";
+import type { TaskType } from "@prisma/client";
+import { ADMIN_ONLY_TASKS, TASK_COLORS, TASK_STATUS_LABELS, TASK_TYPE_LABELS } from "@/server/schedule/task-types";
 import { listTasks } from "@/server/tasks/task-service";
 import { listUsers } from "@/server/users/user-service";
 import { listProjectNames } from "@/server/cases/projects";
@@ -64,8 +65,12 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
             searchPlaceholder="搜尋學校、案件編號、工作…"
             filters={[
               { name: "project", label: "計畫", allLabel: "全部計畫", options: projects.map((p) => ({ value: p, label: p })) },
-              { name: "category", label: "分類", options: Object.entries(TASK_COLORS).map(([value, c]) => ({ value, label: c.label })) },
-              { name: "taskType", label: "工作類型", options: Object.entries(TASK_TYPE_LABELS).map(([value, label]) => ({ value, label })) },
+              { name: "category", label: "分類", options: Object.entries(TASK_COLORS)
+                  .filter(([value]) => user.role === "ADMIN" || value !== "DRAFT")
+                  .map(([value, c]) => ({ value, label: c.label })) },
+              { name: "taskType", label: "工作類型", options: Object.entries(TASK_TYPE_LABELS)
+                  .filter(([value]) => user.role === "ADMIN" || !ADMIN_ONLY_TASKS.includes(value as TaskType))
+                  .map(([value, label]) => ({ value, label })) },
               { name: "status", label: "狀態", options: Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({ value, label })) },
               { name: "assignee", label: "負責人", options: [{ value: "none", label: "未指派" }, ...users.map((u) => ({ value: u.id, label: u.name }))] },
             ]}
